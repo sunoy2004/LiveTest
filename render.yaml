@@ -1,18 +1,17 @@
-services:
-  # 1. Database (Postgres)
-  - type: database
-    name: mentor_db
+databases:
+  - name: mentor_db
     databaseName: mentor_mentee_db
     user: postgres
-    plan: free # Free for 90 days
+    plan: free
 
-  # 2. Redis
+services:
+  # 1. Redis
   - type: redis
     name: mentor_redis
     plan: free
-    ipAllowList: [] # Only allow internal traffic
+    ipAllowList: []
 
-  # 3. User Service
+  # 2. User Service
   - type: web
     name: user-service
     env: docker
@@ -33,7 +32,7 @@ services:
       - key: INTERNAL_API_TOKEN
         generateValue: true
 
-  # 4. AI Service
+  # 3. AI Service
   - type: web
     name: ai-service
     env: docker
@@ -50,9 +49,9 @@ services:
           name: mentor_redis
           property: connectionString
       - key: USER_SERVICE_URL
-        value: http://user-service:10000 # Internal Render Port
+        value: http://user-service:10000
 
-  # 5. Gamification Service
+  # 4. Gamification Service
   - type: web
     name: gamification-service
     env: docker
@@ -69,7 +68,7 @@ services:
           name: mentor_redis
           property: connectionString
 
-  # 6. Notification Service
+  # 5. Notification Service
   - type: web
     name: notification-service
     env: docker
@@ -82,7 +81,7 @@ services:
           name: mentor_db
           property: connectionString
 
-  # 7. Mentoring Service
+  # 6. Mentoring Service
   - type: web
     name: mentoring-service
     env: docker

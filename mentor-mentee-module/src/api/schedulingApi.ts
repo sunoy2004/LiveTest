@@ -1,0 +1,39 @@
+import type { BookSessionResponse, BookingSchedulingContext } from "@/types/scheduling";
+import { getUserServiceBase } from "@/api/userService";
+
+function headers(token: string): HeadersInit {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+}
+
+export async function fetchSchedulingContext(
+  token: string,
+): Promise<BookingSchedulingContext> {
+  const res = await fetch(`${getUserServiceBase()}/scheduling/context`, {
+    headers: headers(token),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `scheduling context (${res.status})`);
+  }
+  return res.json() as Promise<BookingSchedulingContext>;
+}
+
+export async function bookSession(
+  token: string,
+  body: { connection_id: string; slot_id: string; agreed_cost: number },
+): Promise<BookSessionResponse> {
+  const res = await fetch(`${getUserServiceBase()}/scheduling/book`, {
+    method: "POST",
+    headers: headers(token),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `book failed (${res.status})`);
+  }
+  return res.json() as Promise<BookSessionResponse>;
+}

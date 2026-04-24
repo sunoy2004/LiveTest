@@ -1,0 +1,45 @@
+# Local stack for AI recommendation service (pgvector + Redis + app).
+# User-service is not included: set USER_SERVICE_URL to a running instance or use the repo root compose.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: recommendation_db
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d recommendation_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/recommendation_db
+      REDIS_URL: redis://redis:6379/0
+      USER_SERVICE_URL: ${USER_SERVICE_URL:-http://host.docker.internal:8000}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-in-production}
+      JWT_SECRET: ${JWT_SECRET:-secret}
+      EMBEDDING_PROVIDER: opensource
+      RECOMMENDATION_ENGINE: pgvector
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

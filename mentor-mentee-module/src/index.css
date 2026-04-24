@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Theme tokens are scoped to [data-mentor-mfe-root] so when this app is federated into
+ * common-ui-shell, host :root variables do not override mentor styling.
+ */
+@layer base {
+  [data-mentor-mfe-root] {
+    --background: 225 25% 97%;
+    --foreground: 224 30% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 30% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 30% 14%;
+    --primary: 234 85% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 250 85% 68%;
+    --secondary: 220 20% 95%;
+    --secondary-foreground: 224 30% 14%;
+    --muted: 220 14% 94%;
+    --muted-foreground: 220 10% 46%;
+    --accent: 234 85% 96%;
+    --accent-foreground: 234 85% 45%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 234 85% 58%;
+    --radius: 0.75rem;
+    --success: 152 60% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    --gradient-primary: linear-gradient(135deg, hsl(234 85% 58%), hsl(250 85% 68%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(225 25% 98%));
+    --shadow-soft: 0 1px 3px 0 hsl(234 85% 58% / 0.04), 0 1px 2px -1px hsl(234 85% 58% / 0.04);
+    --shadow-card: 0 4px 24px -4px hsl(234 85% 58% / 0.08);
+    --shadow-card-hover: 0 8px 32px -4px hsl(234 85% 58% / 0.14);
+    --shadow-glow: 0 0 20px -4px hsl(234 85% 58% / 0.25);
+  }
+
+  [data-mentor-mfe-root].dark {
+    --background: 224 32% 9%;
+    --foreground: 210 40% 98%;
+    --card: 222 40% 12%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 40% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 234 85% 62%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 250 75% 68%;
+    --secondary: 220 28% 16%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 220 22% 18%;
+    --muted-foreground: 215 18% 62%;
+    --accent: 234 40% 18%;
+    --accent-foreground: 234 90% 78%;
+    --destructive: 0 72% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 22% 20%;
+    --input: 220 22% 18%;
+    --ring: 234 85% 58%;
+    --success: 152 55% 46%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 88% 54%;
+    --warning-foreground: 224 32% 9%;
+    --sidebar-background: 224 32% 8%;
+    --sidebar-foreground: 210 35% 96%;
+    --sidebar-primary: 234 85% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 22% 16%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 220 22% 18%;
+    --sidebar-ring: 234 85% 58%;
+    --gradient-primary: linear-gradient(135deg, hsl(234 85% 56%), hsl(250 78% 58%));
+    --gradient-card: linear-gradient(145deg, hsl(222 40% 13%), hsl(224 35% 11%));
+    --shadow-soft: 0 1px 3px 0 hsl(0 0% 0% / 0.25), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow-card: 0 4px 24px -4px hsl(0 0% 0% / 0.45);
+    --shadow-card-hover: 0 8px 32px -4px hsl(234 85% 50% / 0.22);
+    --shadow-glow: 0 0 24px -4px hsl(234 85% 55% / 0.35);
+  }
+
+  [data-mentor-mfe-root] *,
+  [data-mentor-mfe-root] *::before,
+  [data-mentor-mfe-root] *::after {
+    @apply border-border;
+  }
+
+  [data-mentor-mfe-root] {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-card-hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-sm;
+  }
+}

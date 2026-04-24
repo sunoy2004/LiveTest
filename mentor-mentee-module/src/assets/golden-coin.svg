@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="coinGold" x1="8" y1="10" x2="56" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF4C2"/>
+      <stop offset="0.35" stop-color="#E8C547"/>
+      <stop offset="0.65" stop-color="#C99512"/>
+      <stop offset="1" stop-color="#8A5A0A"/>
+    </linearGradient>
+    <linearGradient id="coinRim" x1="32" y1="6" x2="32" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F0D060"/>
+      <stop offset="0.5" stop-color="#D4A017"/>
+      <stop offset="1" stop-color="#9A6B0C"/>
+    </linearGradient>
+    <radialGradient id="coinShine" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(24 20) rotate(52) scale(40)">
+      <stop stop-color="#FFFAE8" stop-opacity="0.95"/>
+      <stop offset="0.35" stop-color="#FFFAE8" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#FFFAE8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#coinRim)"/>
+  <circle cx="32" cy="32" r="25.5" fill="url(#coinGold)" stroke="#6B4708" stroke-width="0.75"/>
+  <circle cx="32" cy="32" r="25.5" fill="url(#coinShine)"/>
+  <circle cx="32" cy="32" r="18" stroke="#A67408" stroke-opacity="0.45" stroke-width="1"/>
+  <path fill="#7A5210" fill-opacity="0.35" d="M32 18c-7.7 0-14 6.3-14 14s6.3 14 14 14 14-6.3 14-14-6.3-14-14-14Zm0 2.2c6.5 0 11.8 5.3 11.8 11.8S38.5 43.8 32 43.8 20.2 38.5 20.2 32 25.5 20.2 32 20.2Z"/>
+</svg>

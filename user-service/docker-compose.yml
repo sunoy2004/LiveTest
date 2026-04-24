@@ -1,0 +1,67 @@
+# For the full stack (single Postgres + all services), use repo-root ../docker-compose.yml.
+# Postgres DNS name inside this compose file is the SERVICE name: "user-db"
+# (Use DATABASE_URL=...@user-db:5432/... — do not use localhost inside containers.)
+services:
+  user-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: users_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - user_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d users_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stack
+
+  redis:
+    image: redis:7-alpine
+    container_name: user-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - stack
+
+  user-service:
+    build: .
+    container_name: user-service-api
+    volumes:
+      - ./app:/app/app
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@user-db:5432/users_db
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-secret}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173}
+      GAMIFICATION_SERVICE_URL: ${GAMIFICATION_SERVICE_URL:-}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
+      USERSERVICE_RESET_ADMIN_PASSWORD: ${USERSERVICE_RESET_ADMIN_PASSWORD:-true}
+    ports:
+      - "8000:8000"
+    depends_on:
+      user-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - stack
+
+networks:
+  stack:
+    # Stable name for other compose files (docker-compose.microservices.yml) via `external: true`.
+    # Not `user-service_default` — that name collides with legacy Compose default networks (wrong com.docker.compose.network label).
+    name: mentor_stack
+    driver: bridge
+
+volumes:
+  user_data:

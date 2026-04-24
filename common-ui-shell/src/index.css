@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 18% 97%;
+    --foreground: 224 30% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 30% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 30% 12%;
+    --primary: 234 85% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 94%;
+    --secondary-foreground: 224 30% 12%;
+    --muted: 220 14% 94%;
+    --muted-foreground: 220 10% 42%;
+    --accent: 234 85% 96%;
+    --accent-foreground: 234 85% 40%;
+    --destructive: 0 72% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 234 85% 55%;
+    --radius: 0.75rem;
+    --sidebar: 224 32% 10%;
+    --sidebar-foreground: 210 35% 92%;
+    --sidebar-accent: 220 22% 18%;
+    --sidebar-border: 220 22% 20%;
+  }
+
+  .dark {
+    --background: 224 32% 8%;
+    --foreground: 210 40% 96%;
+    --card: 224 28% 11%;
+    --card-foreground: 210 40% 96%;
+    --popover: 224 28% 10%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 234 85% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 22% 16%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 220 22% 16%;
+    --muted-foreground: 215 18% 58%;
+    --accent: 234 40% 18%;
+    --accent-foreground: 234 90% 78%;
+    --destructive: 0 62% 48%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 22% 18%;
+    --input: 220 22% 18%;
+    --ring: 234 85% 62%;
+    --sidebar: 224 35% 7%;
+    --sidebar-foreground: 210 35% 92%;
+    --sidebar-accent: 220 22% 14%;
+    --sidebar-border: 220 22% 14%;
+  }
+
+  /* Scope host resets so federated remotes are not restyled by the shell */
+  [data-cui-shell] *,
+  [data-cui-shell] *::before,
+  [data-cui-shell] *::after {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}

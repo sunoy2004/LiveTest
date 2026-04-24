@@ -1,0 +1,34 @@
+steps:
+  # 1. User Service
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest', './user-service']
+
+  # 2. AI Service
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest', './ai-recommendation-service']
+
+  # 3. Gamification Service
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest', './gamification-service']
+
+  # 4. Notification Service
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest', './notification-service']
+
+  # 5. Mentoring Service
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest', './mentor-mentee-module/backend']
+
+images:
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest'
+
+substitutions:
+  _LOCATION: us-central1
+  _REPO_NAME: mentor-mentee-repo
+
+options:
+  machineType: 'E2_HIGHCPU_8'

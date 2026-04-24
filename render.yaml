@@ -1,0 +1,96 @@
+services:
+  # 1. Database (Postgres)
+  - type: database
+    name: mentor_db
+    databaseName: mentor_mentee_db
+    user: postgres
+    plan: free # Free for 90 days
+
+  # 2. Redis
+  - type: redis
+    name: mentor_redis
+    plan: free
+    ipAllowList: [] # Only allow internal traffic
+
+  # 3. User Service
+  - type: web
+    name: user-service
+    env: docker
+    dockerContext: user-service
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mentor_db
+          property: connectionString
+      - key: REDIS_URL
+        fromRedis:
+          name: mentor_redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: INTERNAL_API_TOKEN
+        generateValue: true
+
+  # 4. AI Service
+  - type: web
+    name: ai-service
+    env: docker
+    dockerContext: ai-recommendation-service
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mentor_db
+          property: connectionString
+      - key: REDIS_URL
+        fromRedis:
+          name: mentor_redis
+          property: connectionString
+      - key: USER_SERVICE_URL
+        value: http://user-service:10000 # Internal Render Port
+
+  # 5. Gamification Service
+  - type: web
+    name: gamification-service
+    env: docker
+    dockerContext: gamification-service
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mentor_db
+          property: connectionString
+      - key: REDIS_URL
+        fromRedis:
+          name: mentor_redis
+          property: connectionString
+
+  # 6. Notification Service
+  - type: web
+    name: notification-service
+    env: docker
+    dockerContext: notification-service
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mentor_db
+          property: connectionString
+
+  # 7. Mentoring Service
+  - type: web
+    name: mentoring-service
+    env: docker
+    dockerContext: mentor-mentee-module/backend
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mentor_db
+          property: connectionString

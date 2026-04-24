@@ -1,0 +1,102 @@
+# Optional partial stack (AI, gamification, notification + their DBs) on network `mentor_stack`.
+# Canonical full stack: run `docker compose up --build` from repo root (docker-compose.yml)
+# — that creates mentor_stack, shared Postgres/Redis, and all services including user-service.
+# If you use ONLY this file, create the network first: `docker network create mentor_stack`
+# (or start root / user-service compose once so the network exists).
+
+services:
+  ai-service:
+    build: ./ai-recommendation-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/recommendation_db}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8000}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-in-production}
+      JWT_SECRET: ${JWT_SECRET:-secret}
+      AI_TRUST_GATEWAY_HEADERS: ${AI_TRUST_GATEWAY_HEADERS:-false}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-opensource}
+      RECOMMENDATION_ENGINE: ${RECOMMENDATION_ENGINE:-pgvector}
+    ports:
+      - "8001:8000"
+    networks:
+      - usernet
+
+  gamification-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gamification_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - gamification_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gamification_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+      - usernet
+
+  gamification-service:
+    build: ./gamification-service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@gamification-db:5432/gamification_db
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_SECRET: ${JWT_SECRET:-secret}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-in-production}
+      GAMIFICATION_ADMIN_USERNAME: ${GAMIFICATION_ADMIN_USERNAME:-admin}
+      GAMIFICATION_ADMIN_PASSWORD: ${GAMIFICATION_ADMIN_PASSWORD:-change-me-in-production}
+      CORS_ALLOW_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5176,http://127.0.0.1:5176,http://localhost:4173,http://127.0.0.1:4173,http://localhost:8002,http://127.0.0.1:8002
+    ports:
+      - "8002:8000"
+    depends_on:
+      gamification-db:
+        condition: service_healthy
+    networks:
+      - default
+      - usernet
+
+  notifications-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notifications_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - notifications_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notifications_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+      - usernet
+
+  notification-service:
+    build: ./notification-service
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@notifications-db:5432/notifications_db
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    ports:
+      - "8003:8000"
+    depends_on:
+      notifications-db:
+        condition: service_healthy
+    networks:
+      - default
+      - usernet
+
+networks:
+  usernet:
+    external: true
+    name: mentor_stack
+
+volumes:
+  gamification_data:
+  notifications_data:

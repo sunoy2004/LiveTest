@@ -15,6 +15,7 @@ services:
     name: user-service
     env: docker
     dockerContext: user-service
+    dockerfilePath: user-service/Dockerfile
     plan: free
     envVars:
       - key: DATABASE_URL
@@ -33,6 +34,7 @@ services:
     name: ai-service
     env: docker
     dockerContext: ai-recommendation-service
+    dockerfilePath: ai-recommendation-service/Dockerfile
     plan: free
     envVars:
       - key: DATABASE_URL
@@ -49,6 +51,7 @@ services:
     name: gamification-service
     env: docker
     dockerContext: gamification-service
+    dockerfilePath: gamification-service/Dockerfile
     plan: free
     envVars:
       - key: DATABASE_URL
@@ -63,6 +66,7 @@ services:
     name: notification-service
     env: docker
     dockerContext: notification-service
+    dockerfilePath: notification-service/Dockerfile
     plan: free
     envVars:
       - key: DATABASE_URL
@@ -75,6 +79,7 @@ services:
     name: mentoring-service
     env: docker
     dockerContext: mentor-mentee-module/backend
+    dockerfilePath: mentor-mentee-module/backend/Dockerfile
     plan: free
     envVars:
       - key: DATABASE_URL

@@ -1,7 +1,6 @@
 databases:
   - name: mentor_db
     databaseName: mentor_mentee_db
-    user: postgres
     plan: free
 
 services:
@@ -24,9 +23,7 @@ services:
           name: mentor_db
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
-          name: mentor_redis
-          property: connectionString
+        value: redis://mentor_redis:6379
       - key: JWT_SECRET
         generateValue: true
       - key: INTERNAL_API_TOKEN
@@ -45,9 +42,7 @@ services:
           name: mentor_db
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
-          name: mentor_redis
-          property: connectionString
+        value: redis://mentor_redis:6379
       - key: USER_SERVICE_URL
         value: http://user-service:10000
 
@@ -64,9 +59,7 @@ services:
           name: mentor_db
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
-          name: mentor_redis
-          property: connectionString
+        value: redis://mentor_redis:6379
 
   # 5. Notification Service
   - type: web

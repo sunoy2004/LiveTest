@@ -27,13 +27,13 @@ export const normalizeBaseUrl = (url: string | undefined, fallback: string): str
 export const getUserServiceBase = () => {
   return normalizeBaseUrl(
     import.meta.env.VITE_USER_SERVICE_URL,
-    "https://user-service-1095720168864-1095720168864.us-central1.run.app"
+    "https://user-service-1095720168864.us-central1.run.app"
   );
 };
 
 export const getGamificationServiceBase = () => {
   return normalizeBaseUrl(
     import.meta.env.VITE_GAMIFICATION_SERVICE_URL,
-    "https://gamification-service-1095720168864-1095720168864.us-central1.run.app"
+    "https://gamification-service-1095720168864.us-central1.run.app"
   );
 };

@@ -1,6 +1,7 @@
 export type LeaderboardItem = {
   rank: number;
   user_id: string;
+  user_name?: string;
   score: number;
 };
 

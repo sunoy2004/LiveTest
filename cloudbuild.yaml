@@ -57,7 +57,10 @@ steps:
     args: [
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest',
-      '--build-arg', 'VITE_USER_SERVICE_PROXY_TARGET=https://user-service-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_USER_SERVICE_URL=https://user-service-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_MENTORING_API_BASE_URL=https://user-service-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=https://gamification-service-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_AI_API_BASE_URL=https://ai-service-1095720168864.us-central1.run.app',
       './mentor-mentee-module'
     ]
 

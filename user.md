@@ -10,7 +10,9 @@ You can also run `python -m app.seed` from the `user-service` folder to apply th
 
 ##Gamification admin
 user: admin
-password: chnage-me-in-production
+password: admin
+
+
 
 ## Admin
 

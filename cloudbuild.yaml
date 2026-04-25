@@ -63,11 +63,6 @@ images:
 substitutions:
   _LOCATION: us-central1
   _REPO_NAME: mentor-mentee-repo
-  _USER_SERVICE_URL: "http://localhost:8000"
-  _MENTORING_URL: "http://localhost:8000"
-  _GAMIFICATION_URL: "http://localhost:8002"
-  _AI_URL: "http://localhost:8001"
-  _MENTOR_REMOTE_ENTRY: "http://localhost:5001/assets/remoteEntry.js"
 
 options:
   machineType: 'E2_HIGHCPU_8'

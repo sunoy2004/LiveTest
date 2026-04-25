@@ -19,31 +19,34 @@ from app.services.gamification.api.wallet import router as wallet_router
 from app.services.gamification.events.consumer import start_listener, stop_listener
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Run migrations at startup
+async def _run_migrations():
     try:
         from alembic import command
         from alembic.config import Config
         import os
+        from pathlib import Path
         
-        # Determine the path to alembic.ini relative to this file
         base_dir = Path(__file__).resolve().parent.parent
         alembic_cfg = Config(str(base_dir / "alembic.ini"))
         alembic_cfg.set_main_option("script_location", str(base_dir / "alembic"))
         
-        # Override sqlalchemy.url with the environment variable
         db_url = os.getenv("DATABASE_URL")
         if db_url:
-            # Convert asyncpg to psycopg2 for alembic
             if "+asyncpg" in db_url:
                 db_url = db_url.replace("+asyncpg", "+psycopg2", 1)
             alembic_cfg.set_main_option("sqlalchemy.url", db_url)
             
         command.upgrade(alembic_cfg, "head")
+        print("Migrations completed successfully.")
     except Exception as e:
-        print(f"Migration failed: {e}")
+        print(f"Migration background task failed: {e}")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Fire and forget migrations to avoid blocking port binding
+    import asyncio
+    asyncio.create_task(_run_migrations())
+    
     await start_listener()
     try:
         yield

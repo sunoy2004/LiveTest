@@ -21,15 +21,34 @@ steps:
 
   # 6. Common UI Shell
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest', './common-ui-shell']
+    args: [
+      'build', 
+      '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest',
+      '--build-arg', 'VITE_USER_SERVICE_URL=$_USER_SERVICE_URL',
+      '--build-arg', 'VITE_MENTORING_API_BASE_URL=$_MENTORING_URL',
+      '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=$_GAMIFICATION_URL',
+      '--build-arg', 'VITE_AI_API_BASE_URL=$_AI_URL',
+      '--build-arg', 'VITE_MENTOR_REMOTE_ENTRY=$_MENTOR_REMOTE_ENTRY',
+      './common-ui-shell'
+    ]
 
   # 7. Mentee UI
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest', './mentor-mentee-module']
+    args: [
+      'build', 
+      '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest',
+      '--build-arg', 'VITE_USER_SERVICE_PROXY_TARGET=$_USER_SERVICE_URL',
+      './mentor-mentee-module'
+    ]
 
   # 8. Gamification Admin UI
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest', './gamification-service/admin-ui']
+    args: [
+      'build', 
+      '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest',
+      '--build-arg', 'VITE_GAMIFICATION_API_PROXY=$_GAMIFICATION_URL',
+      './gamification-service/admin-ui'
+    ]
 
 images:
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest'
@@ -44,6 +63,12 @@ images:
 substitutions:
   _LOCATION: us-central1
   _REPO_NAME: mentor-mentee-repo
+  _USER_SERVICE_URL: "http://localhost:8000"
+  _MENTORING_URL: "http://localhost:8000"
+  _GAMIFICATION_URL: "http://localhost:8002"
+  _AI_URL: "http://localhost:8001"
+  _MENTOR_REMOTE_ENTRY: "http://localhost:5001/assets/remoteEntry.js"
 
 options:
   machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY

@@ -24,11 +24,11 @@ steps:
     args: [
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest',
-      '--build-arg', 'VITE_USER_SERVICE_URL=$_LIVE_USER_SERVICE_URL',
-      '--build-arg', 'VITE_MENTORING_API_BASE_URL=$_LIVE_MENTORING_URL',
-      '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=$_LIVE_GAMIFICATION_URL',
-      '--build-arg', 'VITE_AI_API_BASE_URL=$_LIVE_AI_URL',
-      '--build-arg', 'VITE_MENTOR_REMOTE_ENTRY=$_LIVE_MENTOR_REMOTE_ENTRY',
+      '--build-arg', 'VITE_USER_SERVICE_URL=https://user-service-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_MENTORING_API_BASE_URL=https://user-service-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=https://gamification-service-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_AI_API_BASE_URL=https://ai-service-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_MENTOR_REMOTE_ENTRY=https://mentee-ui-1095720168864.us-central1.run.app/assets/remoteEntry.js',
       './common-ui-shell'
     ]
 
@@ -37,7 +37,7 @@ steps:
     args: [
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest',
-      '--build-arg', 'VITE_USER_SERVICE_PROXY_TARGET=$_LIVE_USER_SERVICE_URL',
+      '--build-arg', 'VITE_USER_SERVICE_PROXY_TARGET=https://user-service-1095720168864.us-central1.run.app',
       './mentor-mentee-module'
     ]
 
@@ -46,7 +46,7 @@ steps:
     args: [
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest',
-      '--build-arg', 'VITE_GAMIFICATION_API_PROXY=$_LIVE_GAMIFICATION_URL',
+      '--build-arg', 'VITE_GAMIFICATION_API_PROXY=https://gamification-service-1095720168864.us-central1.run.app',
       './gamification-service/admin-ui'
     ]
 

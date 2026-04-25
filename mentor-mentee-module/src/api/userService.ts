@@ -1,3 +1,4 @@
+import { normalizeBaseUrl } from "@/lib/env";
 import type { FullProfileResponse } from "@/types/userServiceProfile";
 
 /** Vite dev/preview proxies this path to User Service — see `vite.config.ts`. */
@@ -43,9 +44,10 @@ function isBareSameOriginAsPage(normalized: string): boolean {
 }
 
 export function getUserServiceBase(): string {
-  const raw = (import.meta.env.VITE_USER_SERVICE_URL as string | undefined)?.trim();
+  const raw = import.meta.env.VITE_USER_SERVICE_URL as string | undefined;
+  const normalized = normalizeBaseUrl(raw, DEFAULT_USER_SERVICE_DIRECT);
+
   if (raw) {
-    const normalized = raw.replace(/\/$/, "");
     if (isLikelyMisconfiguredLocalUserServiceUrl(normalized)) {
       console.warn(
         `[mentor] VITE_USER_SERVICE_URL (${normalized}) looks like a frontend dev port, not User Service. ` +

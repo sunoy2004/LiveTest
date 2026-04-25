@@ -14,11 +14,12 @@ export type GamificationWalletMe = {
   lifetime_earned: number;
 };
 
+import { normalizeBaseUrl } from "@/lib/env";
+
 export function getCreditServiceBase(): string {
   const g = import.meta.env.VITE_GAMIFICATION_SERVICE_URL as string | undefined;
   const legacy = import.meta.env.VITE_CREDIT_SERVICE_URL as string | undefined;
-  const base = g ?? legacy;
-  return (base ?? "http://localhost:8002").replace(/\/$/, "");
+  return normalizeBaseUrl(g ?? legacy, "http://localhost:8002");
 }
 
 /** @deprecated Prefer fetchGamificationWallet — balance is authoritative in gamification ledger. */

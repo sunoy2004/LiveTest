@@ -172,11 +172,14 @@ def _seed_emails() -> list[str]:
 
 
 def ensure_seed_users(db: Session) -> None:
-    """Idempotent: ensure seeded test accounts exist (keeps passwords stable for dev)."""
+    """Idempotent: ensure seeded test accounts exist and have the correct password."""
     for email in _seed_emails():
         u = db.query(User).filter(User.email == email).first()
         if not u:
             db.add(User(email=email, password_hash=hash_password("password123")))
+        else:
+            # Force update password in case it was changed or corrupted
+            u.password_hash = hash_password("password123")
     db.commit()
 
 

@@ -73,20 +73,40 @@ steps:
       './gamification-service/admin-ui'
     ]
 
-  # 9. Auto-Deploy Common UI (Shell)
+  # 9. Auto-Deploy User Service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args: ['run', 'deploy', 'user-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000']
+
+  # 10. Auto-Deploy AI Service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args: ['run', 'deploy', 'ai-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000']
+
+  # 11. Auto-Deploy Gamification Service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args: ['run', 'deploy', 'gamification-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000']
+
+  # 12. Auto-Deploy Notification Service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args: ['run', 'deploy', 'notification-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000']
+
+  # 13. Auto-Deploy Mentoring Service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args: ['run', 'deploy', 'mentoring-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000']
+
+  # 14. Auto-Deploy Common UI (Shell)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args: ['run', 'deploy', 'common-ui-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '80']
 
-  # 10. Auto-Deploy Mentee UI (Remote)
+  # 15. Auto-Deploy Mentee UI (Remote)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args: ['run', 'deploy', 'mentee-ui-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '80']
-
-  # # 11. Auto-Deploy Gamification Admin
-  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  #   entrypoint: 'gcloud'
-  #   args: ['run', 'deploy', 'gamification-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '80']
 
 images:
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest'

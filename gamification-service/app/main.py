@@ -59,21 +59,21 @@ _default_cors = (
 cors_origins = [o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", _default_cors).split(",") if o.strip()]
 _cors_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "").strip() or None
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_origin_regex=_cors_regex,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-_session_secret = os.getenv("GAMIFICATION_ADMIN_SESSION_SECRET", os.getenv("JWT_SECRET", "secret"))
-app.add_middleware(
     SessionMiddleware,
     secret_key=_session_secret,
     session_cookie="gamification_session",
     max_age=60 * 60 * 8,
     same_site="lax",
     https_only=os.getenv("GAMIFICATION_ADMIN_SESSION_HTTPS_ONLY", "").lower() in ("1", "true", "yes"),
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_origin_regex=_cors_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Admin session + CRUD routes first so /admin/* is clearly owned by this app (FastAPI matches in order).

@@ -44,11 +44,11 @@ steps:
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest',
       '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest',
-      '--build-arg', 'VITE_USER_SERVICE_URL=https://user-service-1095720168864.us-central1.run.app',
-      '--build-arg', 'VITE_MENTORING_API_BASE_URL=https://user-service-1095720168864.us-central1.run.app',
-      '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=https://gamification-service-1095720168864.us-central1.run.app',
-      '--build-arg', 'VITE_AI_API_BASE_URL=https://ai-service-1095720168864.us-central1.run.app',
-      '--build-arg', 'VITE_MENTOR_REMOTE_ENTRY=https://mentee-ui-1095720168864.us-central1.run.app/assets/remoteEntry.js',
+      '--build-arg', 'VITE_USER_SERVICE_URL=https://user-service-1095720168864-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_MENTORING_API_BASE_URL=https://user-service-1095720168864-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=https://gamification-service-1095720168864-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_AI_API_BASE_URL=https://ai-service-1095720168864-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_MENTOR_REMOTE_ENTRY=https://mentee-ui-1095720168864-1095720168864.us-central1.run.app/assets/remoteEntry.js',
       './common-ui-shell'
     ]
 

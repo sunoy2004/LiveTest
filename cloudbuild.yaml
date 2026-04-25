@@ -19,12 +19,27 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest', './mentor-mentee-module/backend']
 
+  # 6. Common UI Shell
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest', './common-ui-shell']
+
+  # 7. Mentee UI
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest', './mentor-mentee-module']
+
+  # 8. Gamification Admin UI
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest', './gamification-service/admin-ui']
+
 images:
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest'
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest'
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest'
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest'
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest'
 
 substitutions:
   _LOCATION: us-central1

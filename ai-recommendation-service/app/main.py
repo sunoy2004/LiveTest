@@ -39,10 +39,11 @@ _cors_origins = [
                 "http://127.0.0.1:5173",
                 "http://localhost:4173",
                 "http://127.0.0.1:4173",
+                "http://localhost:8080",
                 "http://127.0.0.1:8080",
-                "https://common-ui-1095720168864.us-central1.run.app",
                 "https://common-ui-1095720168864-1095720168864.us-central1.run.app",
                 "https://mentee-ui-1095720168864-1095720168864.us-central1.run.app",
+                "https://gamification-service-1095720168864-1095720168864.us-central1.run.app",
             ]
         ),
     ).split(",")
@@ -50,7 +51,7 @@ _cors_origins = [
 ]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -66,7 +66,7 @@ async def list_wallets(
     names = {}
     try:
         internal_token = os.getenv("INTERNAL_API_TOKEN", "")
-        user_svc = os.getenv("USER_SERVICE_URL", "https://user-service-1095720168864-1095720168864.us-central1.run.app")
+        user_svc = os.getenv("USER_SERVICE_URL", "http://user-service:8000")
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{user_svc}/internal/users/names",

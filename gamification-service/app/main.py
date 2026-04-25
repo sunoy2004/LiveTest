@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -10,65 +9,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-# Setup basic logging to stdout for Cloud Run
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-logger.info("Gamification Service starting up...")
+from app.services.gamification.admin.auth_routes import router as admin_auth_router
+from app.services.gamification.admin.router import router as admin_router
+from app.services.gamification.api.internal import router as internal_router
+from app.services.gamification.api.internal_rules import router as internal_rules_router
+from app.services.gamification.api.leaderboard import router as leaderboard_router
+from app.services.gamification.api.legacy import router as legacy_router
+from app.services.gamification.api.wallet import router as wallet_router
+from app.services.gamification.events.consumer import start_listener, stop_listener
 
-try:
-    from app.services.gamification.admin.auth_routes import router as admin_auth_router
-    from app.services.gamification.admin.router import router as admin_router
-    from app.services.gamification.api.internal import router as internal_router
-    from app.services.gamification.api.internal_rules import router as internal_rules_router
-    from app.services.gamification.api.leaderboard import router as leaderboard_router
-    from app.services.gamification.api.legacy import router as legacy_router
-    from app.services.gamification.api.wallet import router as wallet_router
-    from app.services.gamification.events.consumer import start_listener, stop_listener
-    logger.info("Routers and listeners imported successfully.")
-except Exception as e:
-    logger.error(f"Failed to import routers/listeners: {e}")
-    raise
-
-
-async def _run_migrations():
-    logger.info("Background migrations started.")
-    try:
-        from alembic import command
-        from alembic.config import Config
-        
-        base_dir = Path(__file__).resolve().parent.parent
-        alembic_cfg = Config(str(base_dir / "alembic.ini"))
-        alembic_cfg.set_main_option("script_location", str(base_dir / "alembic"))
-        
-        db_url = os.getenv("DATABASE_URL")
-        if db_url:
-            if "+asyncpg" in db_url:
-                db_url = db_url.replace("+asyncpg", "+psycopg2", 1)
-            alembic_cfg.set_main_option("sqlalchemy.url", db_url)
-            
-        command.upgrade(alembic_cfg, "head")
-        logger.info("Migrations completed successfully.")
-    except Exception as e:
-        logger.error(f"Migration background task failed: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Entering lifespan...")
-    import asyncio
-    # Background migrations
-    asyncio.create_task(_run_migrations())
-    
-    # Background Redis listener
-    try:
-        await start_listener()
-        logger.info("Redis listener task created.")
-    except Exception as e:
-        logger.error(f"Failed to start Redis listener: {e}")
-
+    await start_listener()
     try:
         yield
     finally:
-        logger.info("Shutting down lifespan...")
         await stop_listener()
 
 
@@ -77,68 +33,62 @@ app = FastAPI(title="Gamification Service", version="1.0.0", lifespan=lifespan)
 
 @app.get("/")
 def service_root():
+    """Identify this process as the gamification FastAPI app (useful when debugging port/proxy mismatches)."""
     return {
         "service": "gamification-service",
         "framework": "fastapi",
         "docs": "/docs",
+        "openapi": "/openapi.json",
         "admin_ui": "/ui/",
         "health": "/health",
     }
 
-try:
-    _default_cors = (
-        "http://localhost:3000,http://127.0.0.1:3000,"
-        "http://localhost:8080,http://127.0.0.1:8080,"
-        "http://localhost:5001,http://127.0.0.1:5001,"
-        "http://localhost:5173,http://127.0.0.1:5173,"
-        "http://localhost:5176,http://127.0.0.1:5176,"
-        "http://localhost:4173,http://127.0.0.1:4173,"
-        "http://localhost:8002,http://127.0.0.1:8002,"
-        "https://common-ui-1095720168864.us-central1.run.app,"
-        "https://common-ui-1095720168864-1095720168864.us-central1.run.app,"
-        "https://mentee-ui-1095720168864-1095720168864.us-central1.run.app"
-    )
-    cors_origins = [o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", _default_cors).split(",") if o.strip()]
-    _cors_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "").strip() or None
-    _session_secret = os.getenv("GAMIFICATION_ADMIN_SESSION_SECRET", os.getenv("JWT_SECRET", "secret"))
-    
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=_session_secret,
-        session_cookie="gamification_session",
-        max_age=60 * 60 * 8,
-        same_site="lax",
-        https_only=os.getenv("GAMIFICATION_ADMIN_SESSION_HTTPS_ONLY", "").lower() in ("1", "true", "yes"),
-    )
-    
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_origin_regex=_cors_regex,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    
-    app.include_router(admin_auth_router)
-    app.include_router(admin_router)
-    app.include_router(wallet_router)
-    app.include_router(leaderboard_router)
-    app.include_router(internal_router)
-    app.include_router(internal_rules_router)
-    app.include_router(legacy_router)
-    
-    _static = Path(__file__).resolve().parent / "static" / "admin"
-    if _static.is_dir():
-        app.mount("/ui", StaticFiles(directory=_static, html=True), name="admin_ui")
-        logger.info(f"Mounted Admin UI from {_static}")
-    else:
-        logger.warning(f"Admin UI directory not found at {_static}")
 
-    logger.info("Middleware and routers configured successfully.")
-except Exception as e:
-    logger.error(f"Configuration error: {e}")
-    raise
+_default_cors = (
+    "http://localhost:3000,http://127.0.0.1:3000,"
+    "http://localhost:8080,http://127.0.0.1:8080,"
+    "http://localhost:5001,http://127.0.0.1:5001,"
+    "http://localhost:5173,http://127.0.0.1:5173,"
+    "http://localhost:5176,http://127.0.0.1:5176,"
+    "http://localhost:4173,http://127.0.0.1:4173,"
+    "http://localhost:8002,http://127.0.0.1:8002,"
+    "https://common-ui-1095720168864-1095720168864.us-central1.run.app,"
+    "https://mentee-ui-1095720168864-1095720168864.us-central1.run.app,"
+    "https://gamification-service-1095720168864-1095720168864.us-central1.run.app"
+)
+cors_origins = [o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", _default_cors).split(",") if o.strip()]
+_cors_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "").strip() or None
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_origin_regex=_cors_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+_session_secret = os.getenv("GAMIFICATION_ADMIN_SESSION_SECRET", os.getenv("JWT_SECRET", "secret"))
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=_session_secret,
+    session_cookie="gamification_session",
+    max_age=60 * 60 * 8,
+    same_site="lax",
+    https_only=os.getenv("GAMIFICATION_ADMIN_SESSION_HTTPS_ONLY", "").lower() in ("1", "true", "yes"),
+)
+
+# Admin session + CRUD routes first so /admin/* is clearly owned by this app (FastAPI matches in order).
+app.include_router(admin_auth_router)
+app.include_router(admin_router)
+app.include_router(wallet_router)
+app.include_router(leaderboard_router)
+app.include_router(internal_router)
+app.include_router(internal_rules_router)
+app.include_router(legacy_router)
+
+# REST API uses /admin/* — serve SPA at /ui to avoid shadowing routes.
+_static = Path(__file__).resolve().parent / "static" / "admin"
+if _static.is_dir():
+    app.mount("/ui", StaticFiles(directory=_static, html=True), name="admin_ui")
 
 
 @app.get("/health")

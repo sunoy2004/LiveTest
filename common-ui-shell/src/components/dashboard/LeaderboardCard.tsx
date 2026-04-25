@@ -35,7 +35,7 @@ export function LeaderboardCard() {
             <div key={r.user_id} className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="w-8 text-sm font-semibold text-muted-foreground">#{r.rank}</span>
-                <span className="truncate font-medium text-sm text-foreground">{r.user_name || r.user_id}</span>
+                <span className="truncate font-mono text-xs text-muted-foreground">{r.user_id}</span>
               </div>
               <span className="text-sm font-semibold text-foreground">{r.score}</span>
             </div>

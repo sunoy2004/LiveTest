@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 class LeaderboardItem(BaseModel):
     rank: int = Field(ge=1)
     user_id: UUID
-    user_name: str | None = None
     score: int = Field(ge=0)
 
 

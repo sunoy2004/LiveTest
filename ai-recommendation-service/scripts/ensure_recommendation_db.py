@@ -51,8 +51,13 @@ def main() -> int:
         print("ensure_recommendation_db: no database name in URL, skipping", file=sys.stderr)
         return 0
 
+    # Handle Cloud SQL / Unix socket paths in the query string
+    host = url.host
+    if not host and "host" in url.query:
+        host = url.query["host"]
+
     conn = psycopg2.connect(
-        host=url.host,
+        host=host,
         port=url.port or 5432,
         user=url.username,
         password=url.password,

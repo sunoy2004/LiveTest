@@ -1,11 +1,27 @@
 steps:
   # 1. User Service
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest', './user-service']
-
-  # 2. AI Service
+    entrypoint: 'bash'
+    args: ['-c', 'docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest || exit 0']
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest', './ai-recommendation-service']
+    args: [
+      'build', 
+      '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest',
+      './user-service'
+    ]
+
+  # 2. AI Service (Heavy)
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args: ['-c', 'docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest || exit 0']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest',
+      './ai-recommendation-service'
+    ]
 
   # 3. Gamification Service
   - name: 'gcr.io/cloud-builders/docker'
@@ -19,11 +35,15 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest', './mentor-mentee-module/backend']
 
-  # 6. Common UI Shell
+  # 6. Common UI Shell (Heavy)
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args: ['-c', 'docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest || exit 0']
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest',
       '--build-arg', 'VITE_USER_SERVICE_URL=https://user-service-1095720168864.us-central1.run.app',
       '--build-arg', 'VITE_MENTORING_API_BASE_URL=https://user-service-1095720168864.us-central1.run.app',
       '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=https://gamification-service-1095720168864.us-central1.run.app',
@@ -49,6 +69,21 @@ steps:
       '--build-arg', 'VITE_GAMIFICATION_API_PROXY=https://gamification-service-1095720168864.us-central1.run.app',
       './gamification-service/admin-ui'
     ]
+
+  # 9. Auto-Deploy Common UI (Shell)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args: ['run', 'deploy', 'common-ui-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet']
+
+  # 10. Auto-Deploy Mentee UI (Remote)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args: ['run', 'deploy', 'mentee-ui-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet']
+
+  # 11. Auto-Deploy Gamification Admin
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args: ['run', 'deploy', 'gamification-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet']
 
 images:
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest'

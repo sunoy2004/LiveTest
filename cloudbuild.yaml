@@ -57,10 +57,10 @@ steps:
     args: [
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest',
-      '--build-arg', 'VITE_USER_SERVICE_URL=https://user-service-1095720168864.us-central1.run.app',
-      '--build-arg', 'VITE_MENTORING_API_BASE_URL=https://user-service-1095720168864.us-central1.run.app',
-      '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=https://gamification-service-1095720168864.us-central1.run.app',
-      '--build-arg', 'VITE_AI_API_BASE_URL=https://ai-service-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_USER_SERVICE_URL=https://user-service-1095720168864-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_MENTORING_API_BASE_URL=https://user-service-1095720168864-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=https://gamification-service-1095720168864-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_AI_API_BASE_URL=https://ai-service-1095720168864-1095720168864.us-central1.run.app',
       './mentor-mentee-module'
     ]
 
@@ -69,44 +69,44 @@ steps:
     args: [
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest',
-      '--build-arg', 'VITE_GAMIFICATION_API_PROXY=https://gamification-service-1095720168864.us-central1.run.app',
+      '--build-arg', 'VITE_GAMIFICATION_API_PROXY=https://gamification-service-1095720168864-1095720168864.us-central1.run.app',
       './gamification-service/admin-ui'
     ]
 
   # 9. Auto-Deploy User Service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
-    args: ['run', 'deploy', 'user-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000', '--add-cloudsql-instances', 'yanc-website:us-central1:mentor-mentee-db', '--set-env-vars', 'DATABASE_URL=postgresql://postgres:123456@/users_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db']
+    args: ['run', 'deploy', 'user-service-1095720168864-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000', '--add-cloudsql-instances', 'yanc-website:us-central1:mentor-mentee-db', '--set-env-vars', 'DATABASE_URL=postgresql://postgres:123456@/users_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db']
 
   # 10. Auto-Deploy AI Service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
-    args: ['run', 'deploy', 'ai-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000', '--add-cloudsql-instances', 'yanc-website:us-central1:mentor-mentee-db', '--set-env-vars', 'DATABASE_URL=postgresql+asyncpg://postgres:123456@/recommendation_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db']
+    args: ['run', 'deploy', 'ai-service-1095720168864-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000', '--add-cloudsql-instances', 'yanc-website:us-central1:mentor-mentee-db', '--set-env-vars', 'DATABASE_URL=postgresql+asyncpg://postgres:123456@/recommendation_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db']
 
   # 11. Auto-Deploy Gamification Service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
-    args: ['run', 'deploy', 'gamification-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000', '--add-cloudsql-instances', 'yanc-website:us-central1:mentor-mentee-db', '--set-env-vars', 'DATABASE_URL=postgresql+asyncpg://postgres:123456@/gamification_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db']
+    args: ['run', 'deploy', 'gamification-service-1095720168864-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000', '--add-cloudsql-instances', 'yanc-website:us-central1:mentor-mentee-db', '--set-env-vars', 'DATABASE_URL=postgresql+asyncpg://postgres:123456@/gamification_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db']
 
   # 12. Auto-Deploy Notification Service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
-    args: ['run', 'deploy', 'notification-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000', '--add-cloudsql-instances', 'yanc-website:us-central1:mentor-mentee-db', '--set-env-vars', 'DATABASE_URL=postgresql://postgres:123456@/notifications_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db']
+    args: ['run', 'deploy', 'notification-service-1095720168864-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000', '--add-cloudsql-instances', 'yanc-website:us-central1:mentor-mentee-db', '--set-env-vars', 'DATABASE_URL=postgresql://postgres:123456@/notifications_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db']
 
   # 13. Auto-Deploy Mentoring Service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
-    args: ['run', 'deploy', 'mentoring-service-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000', '--add-cloudsql-instances', 'yanc-website:us-central1:mentor-mentee-db', '--set-env-vars', 'DATABASE_URL=postgresql+asyncpg://postgres:123456@/mentoring?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db']
+    args: ['run', 'deploy', 'mentoring-service-1095720168864-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '8000', '--add-cloudsql-instances', 'yanc-website:us-central1:mentor-mentee-db', '--set-env-vars', 'DATABASE_URL=postgresql+asyncpg://postgres:123456@/mentoring?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db']
 
   # 14. Auto-Deploy Common UI (Shell)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
-    args: ['run', 'deploy', 'common-ui-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '80']
+    args: ['run', 'deploy', 'common-ui-1095720168864-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '80']
 
   # 15. Auto-Deploy Mentee UI (Remote)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
-    args: ['run', 'deploy', 'mentee-ui-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '80']
+    args: ['run', 'deploy', 'mentee-ui-1095720168864-1095720168864', '--image', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest', '--region', '$_LOCATION', '--platform', 'managed', '--quiet', '--port', '80']
 
 images:
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest'

@@ -14,4 +14,4 @@ COPY alembic.ini .
 COPY --from=ui /build/app/static/admin ./app/static/admin
 ENV PYTHONPATH=/app
 EXPOSE 8000
-CMD ["sh", "-c", "sleep 2 && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

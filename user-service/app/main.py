@@ -37,7 +37,7 @@ _origins_list = [o.strip() for o in _origins.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

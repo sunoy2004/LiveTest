@@ -41,6 +41,8 @@ _cors_origins = [
                 "http://127.0.0.1:4173",
                 "http://localhost:8080",
                 "http://127.0.0.1:8080",
+                "https://common-ui-1095720168864.us-central1.run.app",
+                "https://mentee-ui-1095720168864.us-central1.run.app",
             ]
         ),
     ).split(",")

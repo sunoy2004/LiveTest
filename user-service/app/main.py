@@ -28,7 +28,9 @@ app = FastAPI(title="User Service", version="1.0.0", lifespan=lifespan)
 
 _origins = os.getenv(
     "CORS_ORIGINS",
-    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,"
+    "https://common-ui-1095720168864.us-central1.run.app,"
+    "https://mentee-ui-1095720168864.us-central1.run.app",
 )
 _origins_list = [o.strip() for o in _origins.split(",") if o.strip()]
 

@@ -51,7 +51,9 @@ _default_cors = (
     "http://localhost:5173,http://127.0.0.1:5173,"
     "http://localhost:5176,http://127.0.0.1:5176,"
     "http://localhost:4173,http://127.0.0.1:4173,"
-    "http://localhost:8002,http://127.0.0.1:8002"
+    "http://localhost:8002,http://127.0.0.1:8002,"
+    "https://common-ui-1095720168864.us-central1.run.app,"
+    "https://mentee-ui-1095720168864.us-central1.run.app"
 )
 cors_origins = [o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", _default_cors).split(",") if o.strip()]
 _cors_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "").strip() or None

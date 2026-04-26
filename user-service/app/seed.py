@@ -61,7 +61,7 @@ def run_seed_all(*, force_dashboard: bool = False) -> None:
     Base.metadata.create_all(bind=engine)
     db: Session = SessionLocal()
     try:
-        purge_users_not_in_seed_allowlist(db)
+        # purge_users_not_in_seed_allowlist(db)
         ensure_seed_users(db)
         ensure_admin_user(db)
         ensure_seed_profiles(db)

@@ -47,7 +47,9 @@ class MentorshipRequestService:
 
         _ensure_mentorship_allowed(mentee)
 
-        mentor = await self._session.get(MentorProfile, body.mentor_id)
+        mentor = await self._session.scalar(
+            select(MentorProfile).where(MentorProfile.user_id == body.mentor_id),
+        )
         if mentor is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Mentor profile not found")
 

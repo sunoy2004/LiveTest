@@ -51,6 +51,24 @@ async def get_active_connections(
     return [MentorshipRequestRead(**r) for r in reqs]
 
 
+@router.get("/connections/{connection_id}/goals", response_model=list[dict])
+async def get_connection_goals(
+    connection_id: uuid.UUID,
+    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
+) -> list[dict]:
+    """Fetch goals for a specific connection (bridge for User Service dashboard)."""
+    return await svc.get_goals(connection_id)
+
+
+@router.get("/connections/{connection_id}/vault", response_model=list[dict])
+async def get_connection_vault(
+    connection_id: uuid.UUID,
+    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
+) -> list[dict]:
+    """Fetch session history/vault for a connection (bridge for User Service dashboard)."""
+    return await svc.get_vault(connection_id)
+
+
 @router.get("/admin/connections", response_model=list[dict])
 async def admin_get_all_connections(
     svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],

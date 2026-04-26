@@ -28,3 +28,25 @@ async def get_active_connections_from_mentoring_service(user_id: uuid.UUID) -> L
     except Exception as e:
         logger.error("Failed to connect to Mentoring Service at %s: %s", url, e)
         return []
+
+async def get_goals_from_mentoring_service(connection_id: uuid.UUID) -> List[Dict]:
+    """Fetch goals for a connection from the Mentoring Service."""
+    url = f"{MENTORING_SERVICE_URL}/api/v1/requests/connections/{connection_id}/goals"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+            return response.json() if response.status_code == 200 else []
+    except Exception as e:
+        logger.error("Failed to fetch goals from Mentoring Service: %s", e)
+        return []
+
+async def get_vault_from_mentoring_service(connection_id: uuid.UUID) -> List[Dict]:
+    """Fetch vault items for a connection from the Mentoring Service."""
+    url = f"{MENTORING_SERVICE_URL}/api/v1/requests/connections/{connection_id}/vault"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+            return response.json() if response.status_code == 200 else []
+    except Exception as e:
+        logger.error("Failed to fetch vault from Mentoring Service: %s", e)
+        return []

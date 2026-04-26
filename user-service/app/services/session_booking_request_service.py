@@ -30,7 +30,7 @@ def _party_user_ids(db: Session, conn: MentorshipConnection) -> tuple[UUID, UUID
     return mp.user_id, me.user_id
 
 
-def create_session_booking_request(
+async def create_session_booking_request(
     db: Session,
     *,
     user: User,
@@ -47,12 +47,26 @@ def create_session_booking_request(
         .filter(MentorshipConnection.id == connection_id)
         .one_or_none()
     )
-    if not conn or conn.status != "ACTIVE":
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
+    # --- CROSS-SERVICE BRIDGE ---
+    if not conn:
+        from app.services.mentoring_client import get_active_connections_from_mentoring_service
+        remotes = await get_active_connections_from_mentoring_service(user.id)
+        found = next((c for c in remotes if uuid.UUID(str(c["id"])) == connection_id), None)
+        if not found:
+             raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found (bridge check failed)")
+        # Map the remote connection to local profile IDs for the rest of the logic
+        mentor_id = uuid.UUID(str(found["mentor_id"]))
+        mentee_id = uuid.UUID(str(found["mentee_id"]))
+    else:
+        if conn.status != "ACTIVE":
+             raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection is inactive")
+        mentor_id = conn.mentor_id
+        mentee_id = conn.mentee_id
+    # --- END BRIDGE ---
 
     mentee_profile = (
         db.query(MenteeProfile)
-        .filter(MenteeProfile.id == conn.mentee_id)
+        .filter(MenteeProfile.id == mentee_id)
         .one_or_none()
     )
     if not mentee_profile or mentee_profile.user_id != user.id:
@@ -61,7 +75,7 @@ def create_session_booking_request(
             "Only the mentee on this connection can request a session",
         )
 
-    mentor = db.query(MentorProfile).filter(MentorProfile.id == conn.mentor_id).one()
+    mentor = db.query(MentorProfile).filter(MentorProfile.id == mentor_id).one()
     session_cost = resolve_mentor_session_price(db, mentor)
     if agreed_cost is not None and agreed_cost != session_cost:
         raise HTTPException(
@@ -77,7 +91,7 @@ def create_session_booking_request(
     )
     if not slot:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Slot not found")
-    if slot.mentor_id != conn.mentor_id:
+    if slot.mentor_id != mentor_id:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "Slot does not belong to this connection's mentor",
@@ -105,7 +119,7 @@ def create_session_booking_request(
         )
 
     req = SessionBookingRequest(
-        connection_id=conn.id,
+        connection_id=connection_id,
         slot_id=slot.id,
         status="PENDING",
         agreed_cost=session_cost,
@@ -144,7 +158,7 @@ def create_session_booking_request(
     }
 
 
-def accept_session_booking_request(
+async def accept_session_booking_request(
     db: Session,
     *,
     user: User,
@@ -169,7 +183,7 @@ def accept_session_booking_request(
     if not conn or conn.status != "ACTIVE":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
 
-    mentor = db.query(MentorProfile).filter(MentorProfile.id == conn.mentor_id).one()
+    mentor = db.query(MentorProfile).filter(MentorProfile.id == mentor_id).one()
     if mentor.user_id != user.id:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
@@ -178,7 +192,7 @@ def accept_session_booking_request(
 
     mentee_profile = (
         db.query(MenteeProfile)
-        .filter(MenteeProfile.id == conn.mentee_id)
+        .filter(MenteeProfile.id == mentee_id)
         .one()
     )
     slot = (

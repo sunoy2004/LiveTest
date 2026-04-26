@@ -71,49 +71,49 @@ def _parse_dashboard_context(context: str | None) -> str | None:
 
 
 @router.get("/dashboard/upcoming-session", response_model=UpcomingSessionResponse)
-def dashboard_upcoming_session(
+async def dashboard_upcoming_session(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     context: str | None = Query(None),
 ):
     ctx = _parse_dashboard_context(context)
-    raw = get_upcoming_session(db, user=user, context=ctx)
+    raw = await get_upcoming_session(db, user=user, context=ctx)
     if not raw:
         return UpcomingSessionResponse()
     return UpcomingSessionResponse.model_validate(raw)
 
 
 @router.get("/dashboard/upcoming-sessions", response_model=list[UpcomingSessionItem])
-def dashboard_upcoming_sessions(
+async def dashboard_upcoming_sessions(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     context: str | None = Query(None),
     limit: int = Query(5, ge=1, le=20),
 ):
     ctx = _parse_dashboard_context(context)
-    rows = get_upcoming_sessions(db, user=user, context=ctx, limit=limit)
+    rows = await get_upcoming_sessions(db, user=user, context=ctx, limit=limit)
     return [UpcomingSessionItem.model_validate(r) for r in rows]
 
 
 @router.get("/dashboard/goals", response_model=list[GoalItem])
-def dashboard_goals(
+async def dashboard_goals(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     context: str | None = Query(None),
 ):
     ctx = _parse_dashboard_context(context)
-    rows = get_goals(db, user=user, context=ctx)
+    rows = await get_goals(db, user=user, context=ctx)
     return [GoalItem.model_validate(r) for r in rows]
 
 
 @router.get("/dashboard/vault", response_model=list[VaultItem])
-def dashboard_vault(
+async def dashboard_vault(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     context: str | None = Query(None),
 ):
     ctx = _parse_dashboard_context(context)
-    rows = get_vault(db, user=user, context=ctx)
+    rows = await get_vault(db, user=user, context=ctx)
     return [VaultItem.model_validate(r) for r in rows]
 
 

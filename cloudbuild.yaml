@@ -1,29 +1,91 @@
 steps:
-  # 1. User Service
+  # --- 1. User Service ---
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest', './user-service']
-
-  # 2. AI Service
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest || exit 0
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest', './ai-recommendation-service']
+    args: [
+      'build', 
+      '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest',
+      './user-service'
+    ]
 
-  # 3. Gamification Service
+  # --- 2. AI Service ---
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest', './gamification-service']
-
-  # 4. Notification Service
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest || exit 0
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest', './notification-service']
+    args: [
+      'build', 
+      '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest',
+      './ai-recommendation-service'
+    ]
 
-  # 5. Mentoring Service
+  # --- 3. Gamification Service ---
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest', './mentor-mentee-module/backend']
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest || exit 0
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest',
+      './gamification-service'
+    ]
 
-  # 6. Common UI Shell
+  # --- 4. Notification Service ---
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest || exit 0
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest',
+      './notification-service'
+    ]
+
+  # --- 5. Mentoring Service ---
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest || exit 0
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest',
+      './mentor-mentee-module/backend'
+    ]
+
+  # --- 6. Common UI Shell ---
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest || exit 0
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest',
       '--build-arg', 'VITE_USER_SERVICE_URL=$_USER_SERVICE_URL',
       '--build-arg', 'VITE_MENTORING_API_BASE_URL=$_MENTORING_URL',
       '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=$_GAMIFICATION_URL',
@@ -32,11 +94,18 @@ steps:
       './common-ui-shell'
     ]
 
-  # 7. Mentee UI
+  # --- 7. Mentee UI ---
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest || exit 0
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest',
       '--build-arg', 'VITE_USER_SERVICE_URL=$_USER_SERVICE_URL',
       '--build-arg', 'VITE_MENTORING_API_BASE_URL=$_MENTORING_URL',
       '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=$_GAMIFICATION_URL',
@@ -44,11 +113,18 @@ steps:
       './mentor-mentee-module'
     ]
 
-  # 8. Gamification Admin UI
+  # --- 8. Gamification Admin UI ---
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull $_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest || exit 0
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest',
+      '--cache-from', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest',
       '--build-arg', 'VITE_GAMIFICATION_API_PROXY=$_GAMIFICATION_URL',
       './gamification-service/admin-ui'
     ]

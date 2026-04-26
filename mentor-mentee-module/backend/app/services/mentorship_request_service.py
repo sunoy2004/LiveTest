@@ -145,6 +145,32 @@ class MentorshipRequestService:
             out.append(d)
         return out
 
+    async def get_goals(self, connection_id: uuid.UUID) -> list[dict]:
+        from app.models import Goal
+        stmt = select(Goal).where(Goal.connection_id == connection_id)
+        results = (await self._session.execute(stmt)).scalars().all()
+        return [{"id": str(r.id), "title": r.title, "status": r.status} for r in results]
+
+    async def get_vault(self, connection_id: uuid.UUID) -> list[dict]:
+        from app.models import MentorshipSession, SessionHistory
+        stmt = (
+            select(MentorshipSession, SessionHistory)
+            .join(SessionHistory, SessionHistory.session_id == MentorshipSession.id)
+            .where(MentorshipSession.connection_id == connection_id)
+            .order_by(MentorshipSession.start_time.desc())
+        )
+        results = (await self._session.execute(stmt)).all()
+        out = []
+        for sess, hist in results:
+            out.append({
+                "session_id": str(sess.id),
+                "start_time": sess.start_time,
+                "notes": hist.notes_data or {},
+                "mentor_rating": hist.mentor_rating,
+                "mentee_rating": hist.mentee_rating,
+            })
+        return out
+
     async def get_active_connections(self, user_id: uuid.UUID) -> list[dict]:
         # User could be mentor or mentee
         mentor = await self._session.scalar(select(MentorProfile).where(MentorProfile.user_id == user_id))

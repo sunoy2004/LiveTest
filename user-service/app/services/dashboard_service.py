@@ -210,7 +210,7 @@ async def _active_connection_ids_for_viewer(
     return conn_ids, None
 
 
-def _collect_upcoming_payloads(
+async def _collect_upcoming_payloads(
     db: Session,
     *,
     viewer_is_mentor: bool,
@@ -334,21 +334,19 @@ def _collect_upcoming_payloads(
     return out
 
 
-def get_upcoming_session(
+async def get_upcoming_session(
     db: Session,
     *,
     user: User,
     context: str | None,
 ) -> dict | None:
     conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
-    if not conn or viewer_is_mentor is None:
-        return None
-
-    conn_ids, mp = _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=viewer_is_mentor)
+    # Note: resolve_connection is sync but we mainly need viewer_is_mentor
+    conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
     if not conn_ids:
         return None
 
-    rows = _collect_upcoming_payloads(
+    rows = await _collect_upcoming_payloads(
         db,
         viewer_is_mentor=viewer_is_mentor,
         conn_ids=conn_ids,
@@ -359,7 +357,7 @@ def get_upcoming_session(
     return rows[0] if rows else None
 
 
-def get_upcoming_sessions(
+async def get_upcoming_sessions(
     db: Session,
     *,
     user: User,
@@ -370,15 +368,12 @@ def get_upcoming_sessions(
     Next N upcoming items: scheduled sessions plus session booking requests (pending; mentee list also rejected).
     """
     conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
-    if not conn or viewer_is_mentor is None:
-        return []
-
-    conn_ids, mp = _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=viewer_is_mentor)
+    conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
     if not conn_ids:
         return []
 
     include_rejected = not viewer_is_mentor
-    return _collect_upcoming_payloads(
+    return await _collect_upcoming_payloads(
         db,
         viewer_is_mentor=viewer_is_mentor,
         conn_ids=conn_ids,
@@ -388,22 +383,24 @@ def get_upcoming_sessions(
     )
 
 
-def get_goals(
+async def get_goals(
     db: Session,
     *,
     user: User,
     context: str | None,
 ) -> list[dict]:
     conn, _ = resolve_connection(db, user=user, context=context)
+    # --- CROSS-SERVICE BRIDGE ---
+    from app.services.mentoring_client import get_goals_from_mentoring_service
+    # If we have a local connection use it, otherwise we could try to find one from the remote bridge
     if not conn:
+        from app.services.mentoring_client import get_active_connections_from_mentoring_service
+        remotes = await get_active_connections_from_mentoring_service(user.id)
+        if remotes:
+            return await get_goals_from_mentoring_service(uuid.UUID(str(remotes[0]["id"])))
         return []
-    rows = (
-        db.query(Goal)
-        .filter(Goal.connection_id == conn.id)
-        .order_by(Goal.title.asc())
-        .all()
-    )
-    return [{"id": r.id, "title": r.title, "status": r.status} for r in rows]
+    
+    return await get_goals_from_mentoring_service(conn.id)
 
 
 def _session_duration_hours(db: Session, sess: MentorshipSession) -> float:
@@ -522,37 +519,30 @@ async def get_dashboard_stats(
     }
 
 
-def get_vault(
+async def get_vault(
     db: Session,
     *,
     user: User,
     context: str | None,
 ) -> list[dict]:
     conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
-    if not conn or viewer_is_mentor is None:
-        return []
+    # --- CROSS-SERVICE BRIDGE ---
+    from app.services.mentoring_client import get_vault_from_mentoring_service
+    if not conn:
+        from app.services.mentoring_client import get_active_connections_from_mentoring_service
+        remotes = await get_active_connections_from_mentoring_service(user.id)
+        if not remotes:
+            return []
+        conn_id = uuid.UUID(str(remotes[0]["id"]))
+    else:
+        conn_id = conn.id
 
-    partner = _partner_user_for_connection(db, conn, viewer_is_mentor=viewer_is_mentor)
-
-    q = (
-        db.query(MentorshipSession, SessionHistory)
-        .join(SessionHistory, SessionHistory.session_id == MentorshipSession.id)
-        .filter(
-            MentorshipSession.connection_id == conn.id,
-            MentorshipSession.status == "COMPLETED",
-        )
-        .order_by(MentorshipSession.start_time.desc())
-    )
-    out: list[dict] = []
-    for sess, hist in q.all():
-        out.append(
-            {
-                "session_id": sess.id,
-                "start_time": sess.start_time,
-                "notes": hist.notes_data if hist.notes_data is not None else {},
-                "mentor_rating": hist.mentor_rating,
-                "mentee_rating": hist.mentee_rating,
-                "partner_name": _partner_display_name(partner),
-            }
-        )
-    return out
+    rows = await get_vault_from_mentoring_service(conn_id)
+    # Enrich with partner names from local DB if possible
+    partner = None
+    if conn:
+        partner = _partner_user_for_connection(db, conn, viewer_is_mentor=bool(viewer_is_mentor))
+    
+    for r in rows:
+        r["partner_name"] = _partner_display_name(partner)
+    return rows

@@ -14,13 +14,13 @@ router = APIRouter(tags=["sessions"])
 
 
 @router.get("/sessions/upcoming", response_model=list[UpcomingSessionItem])
-def sessions_upcoming(
+async def sessions_upcoming(
     context: str | None = Query(None, description="mentor | mentee"),
     limit: int = Query(5, ge=1, le=20),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return dashboard_service.get_upcoming_sessions(db, user=user, context=context, limit=limit)
+    return await dashboard_service.get_upcoming_sessions(db, user=user, context=context, limit=limit)
 
 
 @router.post("/sessions/{session_id}/complete", response_model=SessionCompleteResponse)

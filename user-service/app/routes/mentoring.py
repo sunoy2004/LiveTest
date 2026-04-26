@@ -57,21 +57,21 @@ def mentor_profile_detail(
 
 
 @router.get("/connected-mentors", response_model=list[ConnectedMentorItem])
-def connected_mentors(
+async def connected_mentors(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    rows = get_connected_mentors_for_mentee(db, user=user)
+    rows = await get_connected_mentors_for_mentee(db, user=user)
     return [ConnectedMentorItem.model_validate(r) for r in rows]
 
 
 @router.get("/availability", response_model=list[AvailableSlotItem])
-def availability(
+async def availability(
     mentor_id: UUID = Query(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    rows = get_available_slots_for_mentor(db, user=user, mentor_id=mentor_id)
+    rows = await get_available_slots_for_mentor(db, user=user, mentor_id=mentor_id)
     return [AvailableSlotItem.model_validate(r) for r in rows]
 
 

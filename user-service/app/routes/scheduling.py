@@ -23,11 +23,11 @@ router = APIRouter()
 
 
 @router.get("/context", response_model=BookingContextResponse)
-def scheduling_context(
+async def scheduling_context(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    ctx = mentee_booking_context(db, user=user)
+    ctx = await mentee_booking_context(db, user=user)
     if not ctx:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
@@ -42,12 +42,12 @@ def scheduling_context(
 
 
 @router.get("/slots", response_model=list[TimeSlotPublic])
-def scheduling_slots(
+async def scheduling_slots(
     connection_id: UUID,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    rows = list_open_slots_for_connection(db, user=user, connection_id=connection_id)
+    rows = await list_open_slots_for_connection(db, user=user, connection_id=connection_id)
     conn = (
         db.query(MentorshipConnection)
         .filter(MentorshipConnection.id == connection_id)
@@ -69,12 +69,12 @@ def scheduling_slots(
 
 
 @router.post("/book", response_model=BookSessionResponse)
-def scheduling_book(
+async def scheduling_book(
     body: BookSessionRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    row = book_slot_saga(
+    row = await book_slot_saga(
         db,
         user=user,
         connection_id=body.connection_id,

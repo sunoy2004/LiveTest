@@ -17,8 +17,8 @@ export type GamificationWalletMe = {
 export function getCreditServiceBase(): string {
   const g = import.meta.env.VITE_GAMIFICATION_SERVICE_URL as string | undefined;
   const legacy = import.meta.env.VITE_CREDIT_SERVICE_URL as string | undefined;
-  const base = g ?? legacy;
-  return (base ?? "http://localhost:8002").replace(/\/$/, "");
+  const base = g ?? legacy ?? "";
+  return base.replace(/\/$/, "");
 }
 
 /** @deprecated Prefer fetchGamificationWallet — balance is authoritative in gamification ledger. */

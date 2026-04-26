@@ -7,7 +7,7 @@ export type LeaderboardItem = {
 function getGamificationBase(): string {
   const g = import.meta.env.VITE_GAMIFICATION_SERVICE_URL as string | undefined;
   const legacy = import.meta.env.VITE_CREDIT_SERVICE_URL as string | undefined;
-  const base = g ?? legacy ?? "http://localhost:8002";
+  const base = g ?? legacy ?? "";
   return base.replace(/\/$/, "");
 }
 

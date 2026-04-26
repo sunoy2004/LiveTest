@@ -70,7 +70,7 @@ substitutions:
   _MENTORING_URL: "https://mentoring-service-1095720168864-1095720168864.us-central1.run.app"
   _GAMIFICATION_URL: "https://gamification-service-1095720168864-1095720168864.us-central1.run.app"
   _AI_URL: "https://ai-service-1095720168864-1095720168864.us-central1.run.app"
-  _MENTOR_REMOTE_ENTRY: "https://mentee-ui-1095720168864-1095720168864.us-central1.run.app/assets/remoteEntry.js"
+  _MENTOR_REMOTE_ENTRY: "https://mentee-ui-1095720168864-1095720168864.us-central1.run.app/remoteEntry.js"
 
 options:
   machineType: 'E2_HIGHCPU_8'

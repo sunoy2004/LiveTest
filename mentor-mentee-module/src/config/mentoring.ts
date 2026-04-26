@@ -28,18 +28,18 @@ function isLikelyMisconfiguredLocalMentoringUrl(base: string): boolean {
 }
 
 function mentoringProxyBase(): string {
-  if (typeof window === "undefined") return `http://localhost:8000${USER_SERVICE_PROXY_PATH}`;
+  if (typeof window === "undefined") return "";
   return `${window.location.origin}${USER_SERVICE_PROXY_PATH}`.replace(/\/$/, "");
 }
 
 /** Mentoring FastAPI (expects API Gateway to inject X-User-Id). */
 export function getMentoringApiBaseUrl(): string {
   const raw = (import.meta.env.VITE_MENTORING_API_BASE_URL ?? "").replace(/\/$/, "");
-  if (!raw) return "";
+  if (!raw) return mentoringProxyBase();
   if (isLikelyMisconfiguredLocalMentoringUrl(raw)) {
     console.warn(
       `[mentor] VITE_MENTORING_API_BASE_URL (${raw}) looks like a frontend dev port without User Service. ` +
-        `Using same-origin ${USER_SERVICE_PROXY_PATH} (see Vite proxy) or set to http://localhost:8000.`,
+        `Using same-origin ${USER_SERVICE_PROXY_PATH} (see Vite proxy).`,
     );
     return mentoringProxyBase();
   }

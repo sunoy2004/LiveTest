@@ -5,8 +5,8 @@ export type LeaderboardItem = {
 };
 
 function getGamificationBase(): string {
-  const base = import.meta.env.VITE_GAMIFICATION_SERVICE_URL as string | undefined;
-  return (base ?? "http://localhost:8002").replace(/\/$/, "");
+  const base = (import.meta.env.VITE_GAMIFICATION_SERVICE_URL as string | undefined) ?? "";
+  return base.replace(/\/$/, "");
 }
 
 export async function fetchLeaderboard(limit = 10): Promise<LeaderboardItem[]> {

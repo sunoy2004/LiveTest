@@ -30,8 +30,8 @@ export function clearAuth(): void {
 }
 
 const USER_SERVICE_PROXY_PATH = "/user-service";
-// Prefer IPv4 for Firefox/Windows: `localhost` may resolve to `::1` while Uvicorn is bound to 127.0.0.1.
-const DEFAULT_USER_SERVICE_DIRECT = "http://127.0.0.1:8000";
+/** Default for local development only. Production should use environment variables or same-origin proxy. */
+const DEFAULT_USER_SERVICE_LOCAL = "http://127.0.0.1:8000";
 
 function isLikelyMisconfiguredLocalUserServiceUrl(base: string): boolean {
   try {
@@ -49,7 +49,7 @@ function isLikelyMisconfiguredLocalUserServiceUrl(base: string): boolean {
 }
 
 function sameOriginProxyBase(): string {
-  if (typeof window === "undefined") return DEFAULT_USER_SERVICE_DIRECT;
+  if (typeof window === "undefined") return DEFAULT_USER_SERVICE_LOCAL;
   return `${window.location.origin}${USER_SERVICE_PROXY_PATH}`.replace(/\/$/, "");
 }
 
@@ -71,7 +71,7 @@ export function getUserServiceBase(): string {
     if (isLikelyMisconfiguredLocalUserServiceUrl(normalized)) {
       console.warn(
         `[shell] VITE_USER_SERVICE_URL (${normalized}) looks like a frontend dev port, not User Service. ` +
-          `Using ${USER_SERVICE_PROXY_PATH} on this origin (see Vite proxy) or set to ${DEFAULT_USER_SERVICE_DIRECT}.`,
+          `Using ${USER_SERVICE_PROXY_PATH} on this origin (see Vite proxy) or set to ${DEFAULT_USER_SERVICE_LOCAL}.`,
       );
       return sameOriginProxyBase();
     }
@@ -83,5 +83,5 @@ export function getUserServiceBase(): string {
   if (typeof window !== "undefined") {
     return sameOriginProxyBase();
   }
-  return DEFAULT_USER_SERVICE_DIRECT;
+  return DEFAULT_USER_SERVICE_LOCAL;
 }

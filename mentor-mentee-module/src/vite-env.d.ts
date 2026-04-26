@@ -15,6 +15,10 @@ interface ImportMetaEnv {
   readonly VITE_DEV_IS_MINOR?: string;
   /** PENDING | GRANTED | NOT_REQUIRED — mentee guardian_consent_status when API offline */
   readonly VITE_DEV_GUARDIAN_CONSENT?: string;
+  /** Gamification Service (credit ledger) base URL */
+  readonly VITE_GAMIFICATION_SERVICE_URL?: string;
+  /** Legacy Credit Service fallback URL */
+  readonly VITE_CREDIT_SERVICE_URL?: string;
 }
 
 interface ImportMeta {

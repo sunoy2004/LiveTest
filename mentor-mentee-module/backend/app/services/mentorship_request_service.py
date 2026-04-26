@@ -233,7 +233,7 @@ class MentorshipRequestService:
         request_id: uuid.UUID,
         acting_user_id: uuid.UUID,
         body: MentorshipRequestStatusUpdate,
-    ) -> MentorshipRequest:
+    ) -> dict:
         req = await self._session.get(MentorshipRequest, request_id)
         if req is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Request not found")
@@ -245,6 +245,10 @@ class MentorshipRequestService:
                 detail="Only the mentor can update this request",
             )
 
+        mentee = await self._session.get(MenteeProfile, req.mentee_id)
+        if mentee is None:
+             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Mentee profile not found")
+
         if req.status != MentorshipRequestStatus.PENDING:
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
@@ -254,23 +258,39 @@ class MentorshipRequestService:
         req.status = body.status
 
         if body.status == MentorshipRequestStatus.ACCEPTED:
-            conn = MentorshipConnection(
-                mentee_id=req.mentee_id,
-                mentor_id=req.mentor_id,
-                status=MentorshipConnectionStatus.ACTIVE,
+            # Prevent duplicate connection errors
+            existing = await self._session.scalar(
+                select(MentorshipConnection).where(
+                    MentorshipConnection.mentor_id == req.mentor_id,
+                    MentorshipConnection.mentee_id == req.mentee_id
+                )
             )
-            self._session.add(conn)
-            await self._session.flush()
-            publish_event(
-                TOPIC_MENTORING_CONNECTIONS,
-                {
-                    "event": "MENTORSHIP_REQUEST_ACCEPTED",
-                    "connection_id": str(conn.id),
-                    "mentor_id": str(req.mentor_id),
-                    "mentee_id": str(req.mentee_id),
-                },
-            )
+            if not existing:
+                conn = MentorshipConnection(
+                    mentee_id=req.mentee_id,
+                    mentor_id=req.mentor_id,
+                    status=MentorshipConnectionStatus.ACTIVE,
+                )
+                self._session.add(conn)
+                await self._session.flush()
+                publish_event(
+                    TOPIC_MENTORING_CONNECTIONS,
+                    {
+                        "event": "MENTORSHIP_REQUEST_ACCEPTED",
+                        "connection_id": str(conn.id),
+                        "mentor_id": str(req.mentor_id),
+                        "mentee_id": str(req.mentee_id),
+                    },
+                )
 
-        await self._session.refresh(req)
         await self._session.commit()
-        return req
+        
+        return {
+            "id": req.id,
+            "mentee_id": req.mentee_id,
+            "mentor_id": req.mentor_id,
+            "status": req.status,
+            "intro_message": req.intro_message,
+            "mentee_name": mentee.full_name,
+            "mentor_name": mentor.full_name,
+        }

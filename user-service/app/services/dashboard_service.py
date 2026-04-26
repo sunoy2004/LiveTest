@@ -422,54 +422,22 @@ async def get_dashboard_stats(
     conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
     conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
     
-    if not conn_ids:
+    # --- CROSS-SERVICE BRIDGE: ADMIN GLOBAL VIEW ---
+    if user.is_admin:
+        from app.services.mentoring_client import get_admin_connections_from_mentoring_service
+        all_conns = await get_admin_connections_from_mentoring_service()
+        unique_mentors = len(set(str(c["mentor_id"]) for c in all_conns))
+        unique_mentees = len(set(str(c["mentee_id"]) for c in all_conns))
+        
+        # Admin sees global counts
         return {
-            "active_partners": 0,
+            "active_partners": unique_mentors if context != "mentor" else unique_mentees,
             "hours_total": 0.0,
             "hours_this_week": 0.0,
             "sessions_completed": 0,
-            "active_sessions": 0,
+            "active_sessions": len(all_conns),
         }
-
-    if viewer_is_mentor:
-        mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
-        if not mp:
-            return {
-                "active_partners": 0,
-                "hours_total": 0.0,
-                "hours_this_week": 0.0,
-                "sessions_completed": 0,
-                "active_sessions": 0,
-            }
-        conn_ids = [
-            r.id
-            for r in db.query(MentorshipConnection)
-            .filter(
-                MentorshipConnection.mentor_id == mp.id,
-                MentorshipConnection.status == "ACTIVE",
-            )
-            .all()
-        ]
-    else:
-        me = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
-        if not me:
-            return {
-                "active_partners": 0,
-                "hours_total": 0.0,
-                "hours_this_week": 0.0,
-                "sessions_completed": 0,
-                "active_sessions": 0,
-            }
-        conn_ids = [
-            r.id
-            for r in db.query(MentorshipConnection)
-            .filter(
-                MentorshipConnection.mentee_id == me.id,
-                MentorshipConnection.status == "ACTIVE",
-            )
-            .all()
-        ]
-
+    
     if not conn_ids:
         return {
             "active_partners": 0,

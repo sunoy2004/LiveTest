@@ -29,3 +29,5 @@ class MentorshipRequestRead(BaseModel):
     mentor_id: uuid.UUID
     status: MentorshipRequestStatus
     intro_message: str
+    mentee_name: str | None = None
+    mentor_name: str | None = None

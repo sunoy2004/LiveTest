@@ -21,6 +21,26 @@ async def create_mentorship_request(
     return MentorshipRequestRead.model_validate(req)
 
 
+@router.get("/incoming", response_model=list[MentorshipRequestRead])
+async def get_incoming_requests(
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
+    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
+) -> list[MentorshipRequestRead]:
+    """Mentor (by X-User-Id) fetches requests sent to them."""
+    reqs = await svc.get_incoming_requests(user_id)
+    return [MentorshipRequestRead(**r) for r in reqs]
+
+
+@router.get("/outgoing", response_model=list[MentorshipRequestRead])
+async def get_outgoing_requests(
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
+    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
+) -> list[MentorshipRequestRead]:
+    """Mentee (by X-User-Id) fetches requests they sent."""
+    reqs = await svc.get_outgoing_requests(user_id)
+    return [MentorshipRequestRead(**r) for r in reqs]
+
+
 @router.put("/{request_id}/status", response_model=MentorshipRequestRead)
 async def update_mentorship_request_status(
     request_id: uuid.UUID,

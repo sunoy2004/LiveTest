@@ -90,6 +90,61 @@ class MentorshipRequestService:
         await self._session.refresh(req)
         return req
 
+    async def get_incoming_requests(self, mentor_user_id: uuid.UUID) -> list[dict]:
+        mentor = await self._session.scalar(
+            select(MentorProfile).where(MentorProfile.user_id == mentor_user_id),
+        )
+        if mentor is None:
+            return []
+        
+        stmt = (
+            select(MentorshipRequest, MenteeProfile.full_name)
+            .join(MenteeProfile, MentorshipRequest.mentee_id == MenteeProfile.id)
+            .where(
+                MentorshipRequest.mentor_id == mentor.id,
+                MentorshipRequest.status == MentorshipRequestStatus.PENDING,
+            )
+        )
+        results = (await self._session.execute(stmt)).all()
+        out = []
+        for req, name in results:
+            d = {
+                "id": req.id,
+                "mentee_id": req.mentee_id,
+                "mentor_id": req.mentor_id,
+                "status": req.status,
+                "intro_message": req.intro_message,
+                "mentee_name": name,
+            }
+            out.append(d)
+        return out
+
+    async def get_outgoing_requests(self, mentee_user_id: uuid.UUID) -> list[dict]:
+        mentee = await self._session.scalar(
+            select(MenteeProfile).where(MenteeProfile.user_id == mentee_user_id),
+        )
+        if mentee is None:
+            return []
+            
+        stmt = (
+            select(MentorshipRequest, MentorProfile.full_name)
+            .join(MentorProfile, MentorshipRequest.mentor_id == MentorProfile.id)
+            .where(MentorshipRequest.mentee_id == mentee.id)
+        )
+        results = (await self._session.execute(stmt)).all()
+        out = []
+        for req, name in results:
+            d = {
+                "id": req.id,
+                "mentee_id": req.mentee_id,
+                "mentor_id": req.mentor_id,
+                "status": req.status,
+                "intro_message": req.intro_message,
+                "mentor_name": name,
+            }
+            out.append(d)
+        return out
+
     async def update_status(
         self,
         request_id: uuid.UUID,

@@ -37,7 +37,7 @@ class ProfileService:
         )
         self._session.add(profile)
         try:
-            await self._session.flush()
+            await self._session.commit()
         except IntegrityError as e:
             await self._session.rollback()
             raise HTTPException(
@@ -73,7 +73,7 @@ class ProfileService:
         )
         self._session.add(profile)
         try:
-            await self._session.flush()
+            await self._session.commit()
         except IntegrityError as e:
             await self._session.rollback()
             raise HTTPException(

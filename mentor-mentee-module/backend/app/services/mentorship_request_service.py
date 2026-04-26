@@ -80,7 +80,7 @@ class MentorshipRequestService:
         )
         self._session.add(req)
         try:
-            await self._session.flush()
+            await self._session.commit()
         except IntegrityError as e:
             await self._session.rollback()
             raise HTTPException(
@@ -189,4 +189,5 @@ class MentorshipRequestService:
             )
 
         await self._session.refresh(req)
+        await self._session.commit()
         return req

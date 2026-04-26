@@ -2,8 +2,9 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.routes import recommendations_router
 from app.api.routes.internal import router as internal_router
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI Matching Service", version="1.0.0", lifespan=lifespan)
 
+# Standard CORS Origins
 _cors_origins = [
     o.strip()
     for o in os.getenv(
@@ -49,6 +51,7 @@ _cors_origins = [
     ).split(",")
     if o.strip()
 ]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -56,6 +59,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    log.exception("Unhandled error at %s", request.url)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "error": str(exc)},
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("Origin", "*"),
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
+
 
 app.include_router(recommendations_router)
 app.include_router(internal_router)

@@ -34,12 +34,12 @@ class RecommendationService:
         key = recommendation_cache.cache_key(
             user_id, limit, hybrid=s.hybrid_scoring
         )
-        cached = await recommendation_cache.get_cached(key)
-        if cached:
-            try:
+        try:
+            cached = await recommendation_cache.get_cached(key)
+            if cached:
                 return json.loads(cached)
-            except json.JSONDecodeError:
-                pass
+        except Exception as e:
+            log.warning("Redis read failed (falling back to DB): %s", e)
 
         ok = await self._repo.source_row_exists_for_mentee(user_id=uid)
         if not ok:
@@ -53,9 +53,14 @@ class RecommendationService:
         for r in rows:
             r["score"] = max(0.0, min(1.0, float(r.get("score", 0.0))))
         out = enrich_recommendation_rows([dict(r) for r in rows], snap)
-        await recommendation_cache.set_cached(
-            key,
-            json.dumps(out),
-            s.recommendation_cache_ttl,
-        )
+        
+        try:
+            await recommendation_cache.set_cached(
+                key,
+                json.dumps(out),
+                s.recommendation_cache_ttl,
+            )
+        except Exception as e:
+            log.warning("Redis write failed: %s", e)
+
         return out

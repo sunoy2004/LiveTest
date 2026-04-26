@@ -19,6 +19,7 @@ export default function AdminSessionsPage() {
     queryKey: ["admin", "sessions", token],
     queryFn: () => fetchAdminSessions(token!),
     enabled: Boolean(token),
+    refetchInterval: 10_000,
   });
 
   return (

@@ -113,6 +113,7 @@ const Index = () => {
     queryFn: () => fetchDashboardStats(token!, role),
     enabled: Boolean(token),
     staleTime: 30_000,
+    refetchInterval: 10_000,
   });
 
   const upcomingSessions = useMemo(
@@ -149,6 +150,7 @@ const Index = () => {
     queryFn: () => fetchGamificationWallet(token!),
     enabled: Boolean(token),
     staleTime: 15_000,
+    refetchInterval: 10_000,
   });
   const credits = walletRes?.current_balance ?? fallbackCredits;
 

@@ -22,6 +22,7 @@ export default function AdminMenteesPage() {
     queryKey: ["admin", "mentees", token],
     queryFn: () => fetchAdminMentees(token!),
     enabled: Boolean(token),
+    refetchInterval: 10_000,
   });
 
   const filtered = useMemo(() => {

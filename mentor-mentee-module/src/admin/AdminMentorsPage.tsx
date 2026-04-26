@@ -120,6 +120,7 @@ export default function AdminMentorsPage() {
     queryKey: ["admin", "mentors", token],
     queryFn: () => fetchAdminMentors(token!),
     enabled: Boolean(token),
+    refetchInterval: 10_000,
   });
 
   const filtered = useMemo(() => {

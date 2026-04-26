@@ -79,6 +79,7 @@ export default function AdminConnectionsPage() {
     queryKey: ["admin", "connections", token],
     queryFn: () => fetchAdminConnections(token!),
     enabled: Boolean(token),
+    refetchInterval: 10_000,
   });
 
   const groups = useMemo(() => groupConnections(q.data ?? []), [q.data]);

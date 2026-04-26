@@ -163,12 +163,24 @@ def _partner_user_for_connection(
     return db.query(User).filter(User.id == mp.user_id).first()
 
 
-def _active_connection_ids_for_viewer(
+async def _active_connection_ids_for_viewer(
     db: Session,
     *,
     user: User,
     viewer_is_mentor: bool,
 ) -> tuple[list, MentorProfile | None]:
+    # --- CROSS-SERVICE BRIDGE ---
+    from app.services.mentoring_client import get_active_connections_from_mentoring_service
+    remote_conns = await get_active_connections_from_mentoring_service(user.id)
+    if remote_conns:
+        # Use remote connection IDs if available
+        conn_ids = [uuid.UUID(str(c["id"])) for c in remote_conns]
+        mp = None
+        if viewer_is_mentor:
+            mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+        return conn_ids, mp
+    # --- END BRIDGE ---
+
     if viewer_is_mentor:
         mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
         if not mp:
@@ -404,21 +416,16 @@ def _session_duration_hours(db: Session, sess: MentorshipSession) -> float:
     return 1.0
 
 
-def get_dashboard_stats(
+async def get_dashboard_stats(
     db: Session,
     *,
     user: User,
     context: str | None,
 ) -> dict:
-    """
-    Aggregate stats across all ACTIVE connections for the viewer role (mentor vs mentee).
-
-    - active_partners: mentee → count of mentors; mentor → count of mentees.
-    - hours_total / hours_this_week: sum of completed session durations (from time_slots).
-    - sessions_completed / active_sessions: COMPLETED vs SCHEDULED counts.
-    """
     conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
-    if not conn or viewer_is_mentor is None:
+    conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
+    
+    if not conn_ids:
         return {
             "active_partners": 0,
             "hours_total": 0.0,

@@ -65,12 +65,12 @@ def admin_list_mentees(
 
 
 @router.get("/connections", response_model=list[AdminConnectionItem])
-def admin_list_connections(
+async def admin_list_connections(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
     limit: int = Query(200, ge=1, le=500),
 ):
-    return admin_service.list_admin_connections(db, limit=limit)
+    return await admin_service.list_admin_connections(db, limit=limit)
 
 
 @router.post("/connections", response_model=AdminConnectionItem)

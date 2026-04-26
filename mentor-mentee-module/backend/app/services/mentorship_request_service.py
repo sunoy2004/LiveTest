@@ -145,6 +145,63 @@ class MentorshipRequestService:
             out.append(d)
         return out
 
+    async def get_active_connections(self, user_id: uuid.UUID) -> list[dict]:
+        # User could be mentor or mentee
+        mentor = await self._session.scalar(select(MentorProfile).where(MentorProfile.user_id == user_id))
+        mentee = await self._session.scalar(select(MenteeProfile).where(MenteeProfile.user_id == user_id))
+        
+        mentor_id = mentor.id if mentor else None
+        mentee_id = mentee.id if mentee else None
+        
+        stmt = (
+            select(MentorshipConnection, MentorProfile.full_name, MenteeProfile.full_name)
+            .join(MentorProfile, MentorshipConnection.mentor_id == MentorProfile.id)
+            .join(MenteeProfile, MentorshipConnection.mentee_id == MenteeProfile.id)
+            .where(
+                (MentorshipConnection.mentor_id == mentor_id) | 
+                (MentorshipConnection.mentee_id == mentee_id),
+                MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE
+            )
+        )
+        results = (await self._session.execute(stmt)).all()
+        out = []
+        for conn, m_name, me_name in results:
+            d = {
+                "id": conn.id,
+                "mentee_id": conn.mentee_id,
+                "mentor_id": conn.mentor_id,
+                "status": MentorshipRequestStatus.ACCEPTED, # Match schema expectation
+                "intro_message": "Active Connection",
+                "mentee_name": me_name,
+                "mentor_name": m_name,
+            }
+            out.append(d)
+        return out
+
+    async def admin_list_all_connections(self) -> list[dict]:
+        stmt = (
+            select(
+                MentorshipConnection,
+                MentorProfile.user_id.label("mentor_user_id"),
+                MenteeProfile.user_id.label("mentee_user_id")
+            )
+            .join(MentorProfile, MentorshipConnection.mentor_id == MentorProfile.id)
+            .join(MenteeProfile, MentorshipConnection.mentee_id == MenteeProfile.id)
+            .where(MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE)
+        )
+        results = (await self._session.execute(stmt)).all()
+        out = []
+        for conn, m_uid, me_uid in results:
+            out.append({
+                "id": str(conn.id),
+                "mentor_id": str(conn.mentor_id),
+                "mentee_id": str(conn.mentee_id),
+                "mentor_user_id": str(m_uid),
+                "mentee_user_id": str(me_uid),
+                "status": "ACTIVE"
+            })
+        return out
+
     async def update_status(
         self,
         request_id: uuid.UUID,

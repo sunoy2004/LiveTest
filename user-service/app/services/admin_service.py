@@ -103,9 +103,49 @@ def list_admin_mentees(db: Session, *, limit: int) -> list[AdminMenteeListItem]:
     return out
 
 
-def list_admin_connections(db: Session, *, limit: int) -> list[AdminConnectionItem]:
+async def list_admin_connections(db: Session, *, limit: int) -> list[AdminConnectionItem]:
+    # --- CROSS-SERVICE BRIDGE ---
+    from app.services.mentoring_client import get_active_connections_from_mentoring_service
+    # For admin, we need to fetch for all users or just get the global list.
+    # Since our bridge get_active_connections takes a user_id, we can either 
+    # update the bridge or call it for the current list of mentees.
+    # A better way is to call a global admin list on the mentoring service.
+    
+    import os
+    import httpx
+    MENTORING_SERVICE_URL = os.getenv("MENTORING_SERVICE_URL", "http://localhost:8000")
+    url = f"{MENTORING_SERVICE_URL}/api/v1/requests/admin/connections"
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                remote_rows = response.json()
+                out: list[AdminConnectionItem] = []
+                for r in remote_rows:
+                    # Enrich with local user data for emails
+                    m_user = db.query(User).filter(User.id == uuid.UUID(str(r["mentor_user_id"]))).first()
+                    me_user = db.query(User).filter(User.id == uuid.UUID(str(r["mentee_user_id"]))).first()
+                    out.append(
+                        AdminConnectionItem(
+                            connection_id=uuid.UUID(str(r["id"])),
+                            mentor_profile_id=uuid.UUID(str(r["mentor_id"])),
+                            mentee_profile_id=uuid.UUID(str(r["mentee_id"])),
+                            mentor_user_id=m_user.id if m_user else uuid.UUID(str(r["mentor_user_id"])),
+                            mentee_user_id=me_user.id if me_user else uuid.UUID(str(r["mentee_user_id"])),
+                            mentor_email=m_user.email if m_user else "unknown@test.com",
+                            mentee_email=me_user.email if me_user else "unknown@test.com",
+                            status=r["status"],
+                        )
+                    )
+                return out
+    except Exception as e:
+        logger.error("Admin bridge failed: %s", e)
+    # --- END BRIDGE ---
+
     MentorUser = aliased(User)
     MenteeUser = aliased(User)
+    # ... fallback to local
     rows = (
         db.query(
             MentorshipConnection,

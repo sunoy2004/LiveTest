@@ -41,6 +41,24 @@ async def get_outgoing_requests(
     return [MentorshipRequestRead(**r) for r in reqs]
 
 
+@router.get("/connections", response_model=list[MentorshipRequestRead])
+async def get_active_connections(
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
+    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
+) -> list[MentorshipRequestRead]:
+    """Fetch active connections for the user (bridge for User Service dashboard)."""
+    reqs = await svc.get_active_connections(user_id)
+    return [MentorshipRequestRead(**r) for r in reqs]
+
+
+@router.get("/admin/connections", response_model=list[dict])
+async def admin_get_all_connections(
+    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
+) -> list[dict]:
+    """Fetch ALL active connections across the platform for admin view."""
+    return await svc.admin_list_all_connections()
+
+
 @router.put("/{request_id}/status", response_model=MentorshipRequestRead)
 async def update_mentorship_request_status(
     request_id: uuid.UUID,

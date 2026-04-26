@@ -118,11 +118,11 @@ def dashboard_vault(
 
 
 @router.get("/dashboard/stats", response_model=DashboardStatsResponse)
-def dashboard_stats(
+async def dashboard_stats(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     context: str | None = Query(None),
 ):
     ctx = _parse_dashboard_context(context)
-    raw = get_dashboard_stats(db, user=user, context=ctx)
+    raw = await get_dashboard_stats(db, user=user, context=ctx)
     return DashboardStatsResponse.model_validate(raw)

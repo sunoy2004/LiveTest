@@ -38,6 +38,9 @@ steps:
       'build', 
       '-t', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest',
       '--build-arg', 'VITE_USER_SERVICE_URL=$_USER_SERVICE_URL',
+      '--build-arg', 'VITE_MENTORING_API_BASE_URL=$_MENTORING_URL',
+      '--build-arg', 'VITE_GAMIFICATION_SERVICE_URL=$_GAMIFICATION_URL',
+      '--build-arg', 'VITE_AI_API_BASE_URL=$_AI_URL',
       './mentor-mentee-module'
     ]
 

@@ -450,14 +450,32 @@ async def get_dashboard_stats(
     now = datetime.now(timezone.utc)
     week_ago = now - timedelta(days=7)
 
-    completed_rows = (
-        db.query(MentorshipSession)
-        .filter(
-            MentorshipSession.connection_id.in_(conn_ids),
-            MentorshipSession.status == "COMPLETED",
-        )
-        .all()
-    )
+    # --- CROSS-SERVICE BRIDGE: Session History ---
+    from app.services.mentoring_client import get_session_history_from_mentoring_service
+    # We fetch for all active connection IDs
+    history_rows = []
+    for c_id in conn_ids:
+        remote_history = await get_session_history_from_mentoring_service(c_id)
+        history_rows.extend(remote_history)
+    
+    hours_total = 0.0
+    hours_week = 0.0
+    sessions_completed = 0
+    
+    for h_row in history_rows:
+        # Expected keys: duration_hours, start_time
+        sessions_completed += 1
+        h = float(h_row.get("duration_hours", 1.0))
+        hours_total += h
+        st_str = h_row.get("start_time")
+        if st_str:
+            try:
+                st = datetime.fromisoformat(st_str.replace("Z", "+00:00"))
+                if st >= week_ago:
+                    hours_week += h
+            except Exception:
+                pass
+
     active_ct = (
         db.query(MentorshipSession)
         .filter(
@@ -466,24 +484,33 @@ async def get_dashboard_stats(
         )
         .count()
     )
-
-    hours_total = 0.0
-    hours_week = 0.0
-    for s in completed_rows:
-        h = _session_duration_hours(db, s)
-        hours_total += h
-        st = s.start_time
-        if st is not None:
-            st_aware = st if st.tzinfo else st.replace(tzinfo=timezone.utc)
-            if st_aware >= week_ago:
-                hours_week += h
+    
+    # Fallback to local if bridge is empty (migration period)
+    if not history_rows:
+        completed_rows = (
+            db.query(MentorshipSession)
+            .filter(
+                MentorshipSession.connection_id.in_(conn_ids),
+                MentorshipSession.status == "COMPLETED",
+            )
+            .all()
+        )
+        sessions_completed = len(completed_rows)
+        for s in completed_rows:
+            h = _session_duration_hours(db, s)
+            hours_total += h
+            st = s.start_time
+            if st is not None:
+                st_aware = st if st.tzinfo else st.replace(tzinfo=timezone.utc)
+                if st_aware >= week_ago:
+                    hours_week += h
 
     return {
         "active_partners": len(conn_ids),
-        "hours_total": round(hours_total, 1),
-        "hours_this_week": round(hours_week, 1),
-        "sessions_completed": len(completed_rows),
-        "active_sessions": int(active_ct),
+        "hours_total": hours_total,
+        "hours_this_week": hours_week,
+        "sessions_completed": sessions_completed,
+        "active_sessions": active_ct,
     }
 
 

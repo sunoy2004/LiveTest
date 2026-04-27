@@ -69,6 +69,15 @@ async def get_connection_vault(
     return await svc.get_vault(connection_id)
 
 
+@router.get("/connections/{connection_id}/history", response_model=list[dict])
+async def get_connection_history(
+    connection_id: uuid.UUID,
+    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
+) -> list[dict]:
+    """Fetch session history (duration, start_time) for a connection dashboard stat."""
+    return await svc.get_session_history_stats(connection_id)
+
+
 @router.get("/admin/connections", response_model=list[dict])
 async def admin_get_all_connections(
     svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],

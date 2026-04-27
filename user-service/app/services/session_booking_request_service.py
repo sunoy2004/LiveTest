@@ -47,16 +47,26 @@ async def create_session_booking_request(
         .filter(MentorshipConnection.id == connection_id)
         .one_or_none()
     )
-    # --- CROSS-SERVICE BRIDGE ---
+    # --- CROSS-SERVICE BRIDGE: Auto-Sync ---
     if not conn:
         from app.services.mentoring_client import get_active_connections_from_mentoring_service
         remotes = await get_active_connections_from_mentoring_service(user.id)
         found = next((c for c in remotes if uuid.UUID(str(c["id"])) == connection_id), None)
         if not found:
              raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found (bridge check failed)")
-        # Map the remote connection to local profile IDs for the rest of the logic
+        
+        # Sync to local DB so existing Join-based queries work
         mentor_id = uuid.UUID(str(found["mentor_id"]))
         mentee_id = uuid.UUID(str(found["mentee_id"]))
+        conn = MentorshipConnection(
+            id=connection_id,
+            mentor_id=mentor_id,
+            mentee_id=mentee_id,
+            status="ACTIVE"
+        )
+        db.add(conn)
+        db.flush()
+        log.info("Synced remote connection %s to local DB", connection_id)
     else:
         if conn.status != "ACTIVE":
              raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection is inactive")
@@ -180,8 +190,12 @@ async def accept_session_booking_request(
         .filter(MentorshipConnection.id == req.connection_id)
         .one_or_none()
     )
-    if not conn or conn.status != "ACTIVE":
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
+    if not conn:
+        # Fallback for old requests or edge cases
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Active connection not found for this request")
+    
+    mentor_id = conn.mentor_id
+    mentee_id = conn.mentee_id
 
     mentor = db.query(MentorProfile).filter(MentorProfile.id == mentor_id).one()
     if mentor.user_id != user.id:

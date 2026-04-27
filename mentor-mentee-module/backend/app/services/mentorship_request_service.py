@@ -170,6 +170,28 @@ class MentorshipRequestService:
                 "mentee_rating": hist.mentee_rating,
             })
         return out
+    async def get_session_history_stats(self, connection_id: uuid.UUID) -> list[dict]:
+        from app.models import MentorshipSession, TimeSlot
+        stmt = (
+            select(MentorshipSession, TimeSlot)
+            .join(TimeSlot, TimeSlot.id == MentorshipSession.slot_id)
+            .where(
+                MentorshipSession.connection_id == connection_id,
+                MentorshipSession.status == "COMPLETED"
+            )
+        )
+        results = (await self._session.execute(stmt)).all()
+        out = []
+        for sess, slot in results:
+            duration = 1.0
+            if slot.start_time and slot.end_time:
+                duration = (slot.end_time - slot.start_time).total_seconds() / 3600.0
+            out.append({
+                "session_id": str(sess.id),
+                "duration_hours": duration,
+                "start_time": sess.start_time.isoformat() if sess.start_time else None
+            })
+        return out
 
     async def get_active_connections(self, user_id: uuid.UUID) -> list[dict]:
         # User could be mentor or mentee

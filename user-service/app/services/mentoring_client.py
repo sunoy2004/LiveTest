@@ -50,3 +50,25 @@ async def get_vault_from_mentoring_service(connection_id: uuid.UUID) -> List[Dic
     except Exception as e:
         logger.error("Failed to fetch vault from Mentoring Service: %s", e)
         return []
+
+async def get_admin_connections_from_mentoring_service() -> List[Dict]:
+    """Admin only: fetch all connections across the platform."""
+    url = f"{MENTORING_SERVICE_URL}/api/v1/requests/admin/connections"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url)
+            return response.json() if response.status_code == 200 else []
+    except Exception as e:
+        logger.error("Failed to fetch admin connections from Mentoring Service: %s", e)
+        return []
+
+async def get_session_history_from_mentoring_service(connection_id: uuid.UUID) -> List[Dict]:
+    """Fetch session history (duration_hours, start_time) for a connection."""
+    url = f"{MENTORING_SERVICE_URL}/api/v1/requests/connections/{connection_id}/history"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+            return response.json() if response.status_code == 200 else []
+    except Exception as e:
+        logger.error("Failed to fetch session history from Mentoring Service: %s", e)
+        return []

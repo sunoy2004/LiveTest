@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -32,14 +33,14 @@ async def get_connected_mentors_for_mentee(db: Session, *, user: User) -> list[d
         out: list[dict] = []
         for c in remote_conns:
             # We need to fetch mentor details from local DB to get expertise/tier
-            mentor_id = uuid.UUID(str(c["mentor_id"]))
+            mentor_id = UUID(str(c["mentor_id"]))
             mentor = db.query(MentorProfile).filter(MentorProfile.id == mentor_id).first()
             if not mentor:
                 continue
             mentor_user = db.query(User).filter(User.id == mentor.user_id).first()
             cost = resolve_mentor_session_price(db, mentor)
             out.append({
-                "connection_id": uuid.UUID(str(c["id"])),
+                "connection_id": UUID(str(c["id"])),
                 "mentor_id": mentor.id,
                 "mentor_name": c.get("mentor_name") or _display_name_from_email(mentor_user.email if mentor_user else ""),
                 "expertise": mentor.expertise_areas or [],
@@ -94,7 +95,7 @@ async def get_available_slots_for_mentor(
     # --- CROSS-SERVICE BRIDGE ---
     from app.services.mentoring_client import get_active_connections_from_mentoring_service
     remote_conns = await get_active_connections_from_mentoring_service(user.id)
-    is_connected = any(uuid.UUID(str(c["mentor_id"])) == mentor_id for c in remote_conns)
+    is_connected = any(UUID(str(c["mentor_id"])) == mentor_id for c in remote_conns)
     
     if not is_connected:
         # Fallback to local
@@ -137,7 +138,7 @@ async def get_available_slots_for_mentor(
     ]
 
 
-def book_session_simple(
+async def book_session_simple(
     db: Session,
     *,
     user: User,
@@ -149,7 +150,7 @@ def book_session_simple(
         connection_id,
         slot_id,
     )
-    return create_session_booking_request(
+    return await create_session_booking_request(
         db,
         user=user,
         connection_id=connection_id,

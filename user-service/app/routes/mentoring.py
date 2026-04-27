@@ -76,12 +76,12 @@ async def availability(
 
 
 @router.post("/book", response_model=BookSessionSimpleResponse)
-def book(
+async def book(
     body: BookSessionSimpleRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    row = book_session_simple(
+    row = await book_session_simple(
         db,
         user=user,
         connection_id=body.connection_id,
@@ -97,21 +97,21 @@ def book(
 
 
 @router.get("/incoming-session-requests", response_model=list[SessionBookingRequestIncomingItem])
-def incoming_session_requests(
+async def incoming_session_requests(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    rows = list_incoming_session_requests(db, user=user)
+    rows = await list_incoming_session_requests(db, user=user)
     return [SessionBookingRequestIncomingItem.model_validate(r) for r in rows]
 
 
 @router.post("/session-requests/{request_id}/accept")
-def accept_session_request(
+async def accept_session_request(
     request_id: UUID,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    session_row = accept_session_booking_request(db, user=user, request_id=request_id)
+    session_row = await accept_session_booking_request(db, user=user, request_id=request_id)
     return {
         "session_id": session_row.id,
         "status": session_row.status,
@@ -121,10 +121,10 @@ def accept_session_request(
 
 
 @router.post("/session-requests/{request_id}/reject")
-def reject_session_request(
+async def reject_session_request(
     request_id: UUID,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    reject_session_booking_request(db, user=user, request_id=request_id)
+    await reject_session_booking_request(db, user=user, request_id=request_id)
     return {"ok": True}

@@ -140,7 +140,9 @@ async def list_admin_connections(db: Session, *, limit: int) -> list[AdminConnec
                     )
                 return out
     except Exception as e:
-        logger.error("Admin bridge failed: %s", e)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("BRIDGE FAILURE: Could not reach Mentorship Service at %s. Error: %s", url, e)
     # --- END BRIDGE ---
 
     MentorUser = aliased(User)

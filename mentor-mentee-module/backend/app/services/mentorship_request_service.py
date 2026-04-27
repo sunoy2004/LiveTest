@@ -273,15 +273,20 @@ class MentorshipRequestService:
                 )
                 self._session.add(conn)
                 await self._session.flush()
-                publish_event(
-                    TOPIC_MENTORING_CONNECTIONS,
-                    {
-                        "event": "MENTORSHIP_REQUEST_ACCEPTED",
-                        "connection_id": str(conn.id),
-                        "mentor_id": str(req.mentor_id),
-                        "mentee_id": str(req.mentee_id),
-                    },
-                )
+                try:
+                    publish_event(
+                        TOPIC_MENTORING_CONNECTIONS,
+                        {
+                            "event": "MENTORSHIP_REQUEST_ACCEPTED",
+                            "connection_id": str(conn.id),
+                            "mentor_id": str(req.mentor_id),
+                            "mentee_id": str(req.mentee_id),
+                        },
+                    )
+                except Exception as e:
+                    # Don't let a notification failure roll back the actual connection
+                    import logging
+                    logging.getLogger(__name__).warning("Notification stub failed: %s", e)
 
         await self._session.commit()
         

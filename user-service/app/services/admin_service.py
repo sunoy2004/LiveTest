@@ -160,12 +160,12 @@ async def list_admin_connections(db: Session, *, limit: int) -> list[AdminConnec
                     out.append(
                         AdminConnectionItem(
                             connection_id=uuid.UUID(str(r["id"])),
-                            mentor_profile_id=m_user.mentor_profile[0].id if m_user.mentor_profile else uuid.UUID(str(r["mentor_id"])),
-                            mentee_profile_id=me_user.mentee_profile[0].id if me_user.mentee_profile else uuid.UUID(str(r["mentee_id"])),
-                            mentor_user_id=m_user.id,
-                            mentee_user_id=me_user.id,
-                            mentor_email=m_user.email,
-                            mentee_email=me_user.email,
+                            mentor_profile_id=uuid.UUID(str(r["mentor_id"])),
+                            mentee_profile_id=uuid.UUID(str(r["mentee_id"])),
+                            mentor_user_id=m_uid,
+                            mentee_user_id=me_uid,
+                            mentor_email=r.get("mentor_email") or (m_user.email if m_user else ""),
+                            mentee_email=r.get("mentee_email") or (me_user.email if me_user else ""),
                             status=r["status"],
                         )
                     )

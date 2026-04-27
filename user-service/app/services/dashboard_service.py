@@ -189,17 +189,24 @@ async def _active_connection_ids_for_viewer(
                 if not db.query(User).filter(User.id == me_uid).first():
                     db.add(User(id=me_uid, email=r.get("mentee_email") or f"mentee_{str(me_uid)[:8]}@shadow.com", is_admin=False))
                 
-                # Ensure profiles exist
-                if not db.query(MentorProfile).filter(MentorProfile.id == uuid.UUID(str(r["mentor_id"]))).first():
-                    db.add(MentorProfile(id=uuid.UUID(str(r["mentor_id"])), user_id=m_uid))
-                if not db.query(MenteeProfile).filter(MenteeProfile.id == uuid.UUID(str(r["mentee_id"]))).first():
-                    db.add(MenteeProfile(id=uuid.UUID(str(r["mentee_id"])), user_id=me_uid))
+                # Ensure profiles exist and get local references
+                l_mentor = db.query(MentorProfile).filter(MentorProfile.id == uuid.UUID(str(r["mentor_id"]))).first()
+                if not l_mentor:
+                    l_mentor = MentorProfile(id=uuid.UUID(str(r["mentor_id"])), user_id=m_uid)
+                    db.add(l_mentor)
                 
-                # Create connection using LOCAL profile IDs to satisfy FK constraints
+                l_mentee = db.query(MenteeProfile).filter(MenteeProfile.id == uuid.UUID(str(r["mentee_id"]))).first()
+                if not l_mentee:
+                    l_mentee = MenteeProfile(id=uuid.UUID(str(r["mentee_id"])), user_id=me_uid)
+                    db.add(l_mentee)
+                
+                db.flush()
+
+                # Create connection using the profile IDs that are now guaranteed to exist
                 db.add(MentorshipConnection(
                     id=c_id,
-                    mentor_id=local_mentor.id,
-                    mentee_id=local_mentee.id,
+                    mentor_id=l_mentor.id,
+                    mentee_id=l_mentee.id,
                     status="ACTIVE"
                 ))
                 db.commit()

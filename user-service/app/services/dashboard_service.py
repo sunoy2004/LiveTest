@@ -195,11 +195,11 @@ async def _active_connection_ids_for_viewer(
                 if not db.query(MenteeProfile).filter(MenteeProfile.id == uuid.UUID(str(r["mentee_id"]))).first():
                     db.add(MenteeProfile(id=uuid.UUID(str(r["mentee_id"])), user_id=me_uid))
                 
-                # Create connection
+                # Create connection using LOCAL profile IDs to satisfy FK constraints
                 db.add(MentorshipConnection(
                     id=c_id,
-                    mentor_id=uuid.UUID(str(r["mentor_id"])),
-                    mentee_id=uuid.UUID(str(r["mentee_id"])),
+                    mentor_id=local_mentor.id,
+                    mentee_id=local_mentee.id,
                     status="ACTIVE"
                 ))
                 db.commit()

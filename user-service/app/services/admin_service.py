@@ -148,13 +148,20 @@ async def list_admin_connections(db: Session, *, limit: int) -> list[AdminConnec
                             db.add(MenteeProfile(id=uuid.UUID(str(r["mentee_id"])), user_id=me_uid))
                             db.flush()
                     
-                    db.commit() # Save stubs
+                    if not db.query(MentorshipConnection).filter(MentorshipConnection.id == uuid.UUID(str(r["id"]))).first():
+                        db.add(MentorshipConnection(
+                            id=uuid.UUID(str(r["id"])),
+                            mentor_id=m_user.mentor_profile[0].id if m_user.mentor_profile else uuid.UUID(str(r["mentor_id"])),
+                            mentee_id=me_user.mentee_profile[0].id if me_user.mentee_profile else uuid.UUID(str(r["mentee_id"])),
+                            status=r["status"]
+                        ))
+                        db.commit()
                     
                     out.append(
                         AdminConnectionItem(
                             connection_id=uuid.UUID(str(r["id"])),
-                            mentor_profile_id=uuid.UUID(str(r["mentor_id"])),
-                            mentee_profile_id=uuid.UUID(str(r["mentee_id"])),
+                            mentor_profile_id=m_user.mentor_profile[0].id if m_user.mentor_profile else uuid.UUID(str(r["mentor_id"])),
+                            mentee_profile_id=me_user.mentee_profile[0].id if me_user.mentee_profile else uuid.UUID(str(r["mentee_id"])),
                             mentor_user_id=m_user.id,
                             mentee_user_id=me_user.id,
                             mentor_email=m_user.email,

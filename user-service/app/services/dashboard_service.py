@@ -169,12 +169,42 @@ async def _active_connection_ids_for_viewer(
     user: User,
     viewer_is_mentor: bool,
 ) -> tuple[list, MentorProfile | None]:
-    # --- CROSS-SERVICE BRIDGE ---
+    # --- CROSS-SERVICE BRIDGE: Persistent Sync ---
     from app.services.mentoring_client import get_active_connections_from_mentoring_service
     remote_conns = await get_active_connections_from_mentoring_service(user.id)
     if remote_conns:
-        # Use remote connection IDs if available
-        conn_ids = [uuid.UUID(str(c["id"])) for c in remote_conns]
+        conn_ids = []
+        for r in remote_conns:
+            c_id = uuid.UUID(str(r["id"]))
+            conn_ids.append(c_id)
+            
+            # Sync to local DB so Join-based queries work
+            if not db.query(MentorshipConnection).filter(MentorshipConnection.id == c_id).first():
+                m_uid = uuid.UUID(str(r["mentor_user_id"]))
+                me_uid = uuid.UUID(str(r["mentee_user_id"]))
+                
+                # Ensure users exist (Shadow Sync)
+                if not db.query(User).filter(User.id == m_uid).first():
+                    db.add(User(id=m_uid, email=r.get("mentor_email") or f"mentor_{str(m_uid)[:8]}@shadow.com", is_admin=False))
+                if not db.query(User).filter(User.id == me_uid).first():
+                    db.add(User(id=me_uid, email=r.get("mentee_email") or f"mentee_{str(me_uid)[:8]}@shadow.com", is_admin=False))
+                
+                # Ensure profiles exist
+                if not db.query(MentorProfile).filter(MentorProfile.id == uuid.UUID(str(r["mentor_id"]))).first():
+                    db.add(MentorProfile(id=uuid.UUID(str(r["mentor_id"])), user_id=m_uid))
+                if not db.query(MenteeProfile).filter(MenteeProfile.id == uuid.UUID(str(r["mentee_id"]))).first():
+                    db.add(MenteeProfile(id=uuid.UUID(str(r["mentee_id"])), user_id=me_uid))
+                
+                # Create connection
+                db.add(MentorshipConnection(
+                    id=c_id,
+                    mentor_id=uuid.UUID(str(r["mentor_id"])),
+                    mentee_id=uuid.UUID(str(r["mentee_id"])),
+                    status="ACTIVE"
+                ))
+                db.commit()
+                log.info("Dashboard Sync: Created local connection %s for user %s", c_id, user.id)
+        
         mp = None
         if viewer_is_mentor:
             mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()

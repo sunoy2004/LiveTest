@@ -123,18 +123,42 @@ async def list_admin_connections(db: Session, *, limit: int) -> list[AdminConnec
                 remote_rows = response.json()
                 out: list[AdminConnectionItem] = []
                 for r in remote_rows:
-                    # Enrich with local user data for emails
-                    m_user = db.query(User).filter(User.id == uuid.UUID(str(r["mentor_user_id"]))).first()
-                    me_user = db.query(User).filter(User.id == uuid.UUID(str(r["mentee_user_id"]))).first()
+                    m_uid = uuid.UUID(str(r["mentor_user_id"]))
+                    me_uid = uuid.UUID(str(r["mentee_user_id"]))
+                    
+                    # Enrich with local user data or create stub if missing
+                    m_user = db.query(User).filter(User.id == m_uid).first()
+                    if not m_user:
+                        m_email = r.get("mentor_email") or f"mentor_{str(m_uid)[:8]}@shadow.com"
+                        m_user = User(id=m_uid, email=m_email, is_admin=False)
+                        db.add(m_user)
+                        db.flush()
+                        # Also create profile stub so joins work
+                        if not db.query(MentorProfile).filter(MentorProfile.id == uuid.UUID(str(r["mentor_id"]))).first():
+                            db.add(MentorProfile(id=uuid.UUID(str(r["mentor_id"])), user_id=m_uid))
+                            db.flush()
+                            
+                    me_user = db.query(User).filter(User.id == me_uid).first()
+                    if not me_user:
+                        me_email = r.get("mentee_email") or f"mentee_{str(me_uid)[:8]}@shadow.com"
+                        me_user = User(id=me_uid, email=me_email, is_admin=False)
+                        db.add(me_user)
+                        db.flush()
+                        if not db.query(MenteeProfile).filter(MenteeProfile.id == uuid.UUID(str(r["mentee_id"]))).first():
+                            db.add(MenteeProfile(id=uuid.UUID(str(r["mentee_id"])), user_id=me_uid))
+                            db.flush()
+                    
+                    db.commit() # Save stubs
+                    
                     out.append(
                         AdminConnectionItem(
                             connection_id=uuid.UUID(str(r["id"])),
                             mentor_profile_id=uuid.UUID(str(r["mentor_id"])),
                             mentee_profile_id=uuid.UUID(str(r["mentee_id"])),
-                            mentor_user_id=m_user.id if m_user else uuid.UUID(str(r["mentor_user_id"])),
-                            mentee_user_id=me_user.id if me_user else uuid.UUID(str(r["mentee_user_id"])),
-                            mentor_email=m_user.email if m_user else "unknown@test.com",
-                            mentee_email=me_user.email if me_user else "unknown@test.com",
+                            mentor_user_id=m_user.id,
+                            mentee_user_id=me_user.id,
+                            mentor_email=m_user.email,
+                            mentee_email=me_user.email,
                             status=r["status"],
                         )
                     )

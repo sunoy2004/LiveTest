@@ -201,16 +201,23 @@ class MentorshipRequestService:
         mentor_id = mentor.id if mentor else None
         mentee_id = mentee.id if mentee else None
         
+        from app.models import User
+        MentorUser = aliased(User)
+        MenteeUser = aliased(User)
         stmt = (
             select(
                 MentorshipConnection, 
                 MentorProfile.full_name.label("m_name"), 
                 MenteeProfile.full_name.label("me_name"),
                 MentorProfile.user_id.label("m_uid"),
-                MenteeProfile.user_id.label("me_uid")
+                MenteeProfile.user_id.label("me_uid"),
+                MentorUser.email.label("m_email"),
+                MenteeUser.email.label("me_email")
             )
             .join(MentorProfile, MentorshipConnection.mentor_id == MentorProfile.id)
             .join(MenteeProfile, MentorshipConnection.mentee_id == MenteeProfile.id)
+            .join(MentorUser, MentorProfile.user_id == MentorUser.id)
+            .join(MenteeUser, MenteeProfile.user_id == MenteeUser.id)
             .where(
                 (MentorshipConnection.mentor_id == mentor_id) | 
                 (MentorshipConnection.mentee_id == mentee_id),
@@ -227,6 +234,8 @@ class MentorshipRequestService:
                 "mentor_id": str(conn.mentor_id),
                 "mentee_user_id": str(row.me_uid),
                 "mentor_user_id": str(row.m_uid),
+                "mentee_email": row.me_email,
+                "mentor_email": row.m_email,
                 "status": "ACCEPTED",
                 "intro_message": "Active Connection",
                 "mentee_name": row.me_name,
@@ -236,25 +245,35 @@ class MentorshipRequestService:
         return out
 
     async def admin_list_all_connections(self) -> list[dict]:
+        from app.models import User
+        MentorUser = aliased(User)
+        MenteeUser = aliased(User)
         stmt = (
             select(
                 MentorshipConnection,
-                MentorProfile.user_id.label("mentor_user_id"),
-                MenteeProfile.user_id.label("mentee_user_id")
+                MentorProfile.user_id.label("m_uid"),
+                MenteeProfile.user_id.label("me_uid"),
+                MentorUser.email.label("m_email"),
+                MenteeUser.email.label("me_email")
             )
             .join(MentorProfile, MentorshipConnection.mentor_id == MentorProfile.id)
             .join(MenteeProfile, MentorshipConnection.mentee_id == MenteeProfile.id)
+            .join(MentorUser, MentorProfile.user_id == MentorUser.id)
+            .join(MenteeUser, MenteeProfile.user_id == MenteeUser.id)
             .where(MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE)
         )
         results = (await self._session.execute(stmt)).all()
         out = []
-        for conn, m_uid, me_uid in results:
+        for row in results:
+            conn = row[0]
             out.append({
                 "id": str(conn.id),
                 "mentor_id": str(conn.mentor_id),
                 "mentee_id": str(conn.mentee_id),
-                "mentor_user_id": str(m_uid),
-                "mentee_user_id": str(me_uid),
+                "mentor_user_id": str(row.m_uid),
+                "mentee_user_id": str(row.me_uid),
+                "mentor_email": row.m_email,
+                "mentee_email": row.me_email,
                 "status": "ACTIVE"
             })
         return out

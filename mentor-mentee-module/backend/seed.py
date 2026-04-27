@@ -92,7 +92,7 @@ async def _seed_mentees(session: AsyncSession) -> None:
                 education_level=edu,
                 is_minor=is_minor,
                 guardian_consent_status=consent,
-                cached_credit_score=score,
+                cached_credit_score=0,
             )
         )
 

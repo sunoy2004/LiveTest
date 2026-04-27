@@ -36,13 +36,7 @@ def _allowed_seed_emails() -> frozenset[str]:
     )
 
 
-def _mentee_seed_wallet_target(index: int) -> int:
-    """User-service mirror + gamification top-up target for mentee_{index}@test.com."""
-    if 1 <= index <= 5:
-        return 200
-    if 6 <= index <= 10:
-        return 500
-    return 500
+
 
 
 def run_seed_all(*, force_dashboard: bool = False) -> None:
@@ -67,12 +61,7 @@ def run_seed_all(*, force_dashboard: bool = False) -> None:
         ensure_seed_profiles(db)
         ensure_seed_connections(db)
         ensure_dashboard_seed(db, force=force_dashboard)
-        bump_mentee_test_wallets(db)
-        ensure_mentee_credit_service_floor_all(db)
         ensure_time_slots_for_demo_mentor(db)
-        ensure_time_slots_for_seed_mentors(db)
-        ensure_slot_costs_for_booking_demo(db)
-        ensure_mentees_welcome_balance(db)
         ensure_sample_dispute(db)
     finally:
         db.close()
@@ -278,7 +267,7 @@ def ensure_seed_profiles(db: Session) -> None:
                     education_level="Undergraduate",
                     is_minor=False,
                     guardian_consent_status="NOT_REQUIRED",
-                    cached_credit_score=_mentee_seed_wallet_target(i),
+                    cached_credit_score=0,
                 )
             )
 
@@ -323,82 +312,7 @@ def ensure_seed_connections(db: Session) -> None:
     db.commit()
 
 
-def bump_mentee_test_wallets(db: Session) -> None:
-    """Sync mentee_1..10 cached_credit_score to seed targets (200 for 1–5, 500 for 6–10)."""
-    for i in range(1, 11):
-        target = _mentee_seed_wallet_target(i)
-        user = db.query(User).filter(User.email == f"mentee_{i}@test.com").first()
-        if not user:
-            continue
-        prof = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
-        if not prof:
-            continue
-        old = int(prof.cached_credit_score)
-        if old == target:
-            continue
-        prof.cached_credit_score = target
-        db.add(
-            CreditLedgerEntry(
-                user_id=user.id,
-                delta=target - old,
-                balance_after=target,
-                reason="Demo wallet top-up (dev seed)",
-            )
-        )
-    db.commit()
 
-
-def ensure_mentee_credit_service_floor_all(db: Session) -> None:
-    """
-    When GAMIFICATION_SERVICE_URL is set, top up each mentee's gamification wallet to the seed target:
-    mentee_1..5 → 200 credits, mentee_6..10 → 500 credits (idempotent; uses /add only).
-    """
-    url = os.getenv("GAMIFICATION_SERVICE_URL", "").strip().rstrip("/")
-    if not url:
-        return
-    for i in range(1, 11):
-        target = _mentee_seed_wallet_target(i)
-        user = db.query(User).filter(User.email == f"mentee_{i}@test.com").first()
-        if not user:
-            continue
-        try:
-            r = httpx.get(f"{url}/balance/{user.id}", timeout=10.0)
-            if r.status_code != 200:
-                log.warning("credit floor: balance GET %s", r.status_code)
-                continue
-            bal = int(r.json().get("balance", 0))
-            need = max(0, target - bal)
-            if need <= 0:
-                log.info(
-                    "gamification wallet OK mentee_%s user_id=%s balance=%s (target=%s)",
-                    i,
-                    user.id,
-                    bal,
-                    target,
-                )
-                continue
-            a = httpx.post(
-                f"{url}/add",
-                json={"user_id": str(user.id), "amount": need, "xp": 0},
-                timeout=15.0,
-            )
-            if a.status_code != 200:
-                log.warning("credit floor: add POST %s %s", a.status_code, a.text[:200])
-            else:
-                try:
-                    new_bal = a.json().get("balance", need + bal)
-                except Exception:  # noqa: BLE001
-                    new_bal = "?"
-                log.info(
-                    "gamification wallet topped up mentee_%s user_id=%s added=%s balance=%s (target=%s)",
-                    i,
-                    user.id,
-                    need,
-                    new_bal,
-                    target,
-                )
-        except Exception as exc:  # noqa: BLE001
-            log.warning("credit floor sync skipped for mentee_%s: %s", i, exc)
 
 
 def ensure_time_slots_for_demo_mentor(db: Session) -> None:
@@ -492,26 +406,7 @@ def ensure_slot_costs_for_booking_demo(db: Session) -> None:
     db.commit()
 
 
-def ensure_mentees_welcome_balance(db: Session) -> None:
-    """Dev/demo: non-seed mentees with zero balance get 100 (seed mentee_1..10 use tiered targets)."""
-    seed_mentee_emails = {f"mentee_{i}@test.com" for i in range(1, 11)}
-    q = (
-        db.query(MenteeProfile)
-        .join(User, User.id == MenteeProfile.user_id)
-        .filter(MenteeProfile.cached_credit_score == 0)
-        .filter(~User.email.in_(seed_mentee_emails))
-    )
-    for p in q.all():
-        p.cached_credit_score = 100
-        db.add(
-            CreditLedgerEntry(
-                user_id=p.user_id,
-                delta=100,
-                balance_after=100,
-                reason="Welcome bonus (dev seed)",
-            )
-        )
-    db.commit()
+
 
 
 def ensure_sample_dispute(db: Session) -> None:

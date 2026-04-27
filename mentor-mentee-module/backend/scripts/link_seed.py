@@ -189,7 +189,7 @@ async def _ensure_userservice_profiles(
                             insert into mentee_profiles
                               (id, user_id, learning_goals, education_level, is_minor, guardian_consent_status, cached_credit_score)
                             values
-                              (:id, :uid, :goals, 'UNDERGRAD', false, 'NOT_REQUIRED', 500)
+                              (:id, :uid, :goals, 'UNDERGRAD', false, 'NOT_REQUIRED', 0)
                             """
                         ),
                         {
@@ -439,7 +439,7 @@ async def _ensure_dual_role_users(
                 education_level="UNDERGRAD",
                 is_minor=False,
                 guardian_consent_status=GuardianConsentStatus.NOT_REQUIRED,
-                cached_credit_score=500,
+                cached_credit_score=0,
             )
             session.add(mentee)
             await session.flush()

@@ -202,7 +202,13 @@ class MentorshipRequestService:
         mentee_id = mentee.id if mentee else None
         
         stmt = (
-            select(MentorshipConnection, MentorProfile.full_name, MenteeProfile.full_name)
+            select(
+                MentorshipConnection, 
+                MentorProfile.full_name.label("m_name"), 
+                MenteeProfile.full_name.label("me_name"),
+                MentorProfile.user_id.label("m_uid"),
+                MenteeProfile.user_id.label("me_uid")
+            )
             .join(MentorProfile, MentorshipConnection.mentor_id == MentorProfile.id)
             .join(MenteeProfile, MentorshipConnection.mentee_id == MenteeProfile.id)
             .where(
@@ -213,15 +219,18 @@ class MentorshipRequestService:
         )
         results = (await self._session.execute(stmt)).all()
         out = []
-        for conn, m_name, me_name in results:
+        for row in results:
+            conn = row[0]
             d = {
-                "id": conn.id,
-                "mentee_id": conn.mentee_id,
-                "mentor_id": conn.mentor_id,
-                "status": MentorshipRequestStatus.ACCEPTED, # Match schema expectation
+                "id": str(conn.id),
+                "mentee_id": str(conn.mentee_id),
+                "mentor_id": str(conn.mentor_id),
+                "mentee_user_id": str(row.me_uid),
+                "mentor_user_id": str(row.m_uid),
+                "status": "ACCEPTED",
                 "intro_message": "Active Connection",
-                "mentee_name": me_name,
-                "mentor_name": m_name,
+                "mentee_name": row.me_name,
+                "mentor_name": row.m_name,
             }
             out.append(d)
         return out

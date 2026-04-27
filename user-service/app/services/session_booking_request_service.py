@@ -52,12 +52,21 @@ async def create_session_booking_request(
         from app.services.mentoring_client import get_active_connections_from_mentoring_service
         remotes = await get_active_connections_from_mentoring_service(user.id)
         found = next((c for c in remotes if uuid.UUID(str(c["id"])) == connection_id), None)
-        if not found:
-             raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found (bridge check failed)")
-        
         # Sync to local DB so existing Join-based queries work
-        mentor_id = uuid.UUID(str(found["mentor_id"]))
-        mentee_id = uuid.UUID(str(found["mentee_id"]))
+        # CRITICAL: If databases were seeded separately, profile IDs won't match.
+        # We must look up the local profile by the GLOBAL user_id.
+        m_uid = uuid.UUID(str(found["mentor_user_id"]))
+        me_uid = uuid.UUID(str(found["mentee_user_id"]))
+        
+        local_mentor = db.query(MentorProfile).filter(MentorProfile.user_id == m_uid).first()
+        local_mentee = db.query(MenteeProfile).filter(MenteeProfile.user_id == me_uid).first()
+        
+        if not local_mentor or not local_mentee:
+             raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection found remotely but local profiles missing for these user IDs")
+
+        mentor_id = local_mentor.id
+        mentee_id = local_mentee.id
+        
         conn = MentorshipConnection(
             id=connection_id,
             mentor_id=mentor_id,
@@ -66,7 +75,7 @@ async def create_session_booking_request(
         )
         db.add(conn)
         db.flush()
-        log.info("Synced remote connection %s to local DB", connection_id)
+        log.info("Synced remote connection %s to local DB using user_ids (M:%s, Me:%s)", connection_id, m_uid, me_uid)
     else:
         if conn.status != "ACTIVE":
              raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection is inactive")
@@ -366,7 +375,7 @@ def reject_session_booking_request(
     )
 
 
-def list_incoming_session_requests(db: Session, *, user: User) -> list[dict]:
+async def list_incoming_session_requests(db: Session, *, user: User) -> list[dict]:
     mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
     if not mp:
         return []

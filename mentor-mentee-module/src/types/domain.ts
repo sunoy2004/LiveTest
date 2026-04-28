@@ -16,6 +16,7 @@ export type SearchRole = "mentor" | "mentee" | "all";
 
 export interface SearchResultItem {
   user_id: string;
+  mentor_profile_id?: string | null;
   full_name?: string | null;
   role: Exclude<SearchRole, "all">;
   expertise: string[];
@@ -23,6 +24,7 @@ export interface SearchResultItem {
   /** Mentors: server-resolved price (admin override or gamification BOOK_MENTOR_SESSION base). */
   session_credit_cost?: number | null;
 }
+
 
 /** GET /api/v1/profiles/me — composite view for the SPA (shapes follow backend contracts). */
 export interface MentoringProfileMeResponse {

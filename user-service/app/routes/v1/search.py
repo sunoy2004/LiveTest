@@ -16,6 +16,7 @@ router = APIRouter()
 
 class SearchResultItem(BaseModel):
     user_id: str
+    mentor_profile_id: str | None = None
     full_name: str | None = None
     role: Literal["mentor", "mentee"]
     expertise: list[str] = Field(default_factory=list)
@@ -24,6 +25,7 @@ class SearchResultItem(BaseModel):
         default=None,
         description="Mentors: credits per session (admin override or BOOK_MENTOR_SESSION base).",
     )
+
 
 
 def _display_name(email: str) -> str:
@@ -71,6 +73,7 @@ def search_directory(
             rows.append(
                 SearchResultItem(
                     user_id=str(mp.user_id),
+                    mentor_profile_id=str(mp.id),
                     full_name=_display_name(email),
                     role="mentor",
                     expertise=expertise,
@@ -78,6 +81,7 @@ def search_directory(
                     session_credit_cost=resolve_mentor_session_price(db, mp),
                 )
             )
+
         return rows
 
     def mentee_slice(max_n: int) -> list[SearchResultItem]:

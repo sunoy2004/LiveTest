@@ -22,3 +22,13 @@ def profiles_me(
         mentee=full.mentee_profile,
         mentor=full.mentor_profile,
     )
+
+
+@router.post("/mentee")
+def post_mentee_profile(
+    body: dict,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from app.services.profile_service import create_or_update_mentee_profile
+    return create_or_update_mentee_profile(db, user_id=user.id, body=body)

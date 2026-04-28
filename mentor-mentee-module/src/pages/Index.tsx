@@ -263,6 +263,8 @@ const Index = () => {
               : 50;
       return {
         id: r.user_id,
+        mentorUserId: r.user_id,
+        mentorProfileId: r.mentor_profile_id ?? undefined,
         name: r.full_name ?? r.user_id,
         avatar: "",
         role: "mentor",
@@ -275,6 +277,7 @@ const Index = () => {
         sessionCostCredits,
         isAvailable: true,
       };
+
     };
 
     const pool = role === "mentee" ? mentorMatches : menteeMatches;

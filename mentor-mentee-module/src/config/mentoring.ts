@@ -34,17 +34,11 @@ function mentoringProxyBase(): string {
 
 /** Mentoring FastAPI (expects API Gateway to inject X-User-Id). */
 export function getMentoringApiBaseUrl(): string {
-  const raw = (import.meta.env.VITE_MENTORING_API_BASE_URL ?? "").replace(/\/$/, "");
-  if (!raw) return mentoringProxyBase();
-  if (isLikelyMisconfiguredLocalMentoringUrl(raw)) {
-    console.warn(
-      `[mentor] VITE_MENTORING_API_BASE_URL (${raw}) looks like a frontend dev port without User Service. ` +
-        `Using same-origin ${USER_SERVICE_PROXY_PATH} (see Vite proxy).`,
-    );
-    return mentoringProxyBase();
-  }
-  return raw;
+  // Force all mentoring calls through the user-service proxy to ensure 
+  // User Service DB is the only source of truth for connections/requests.
+  return mentoringProxyBase();
 }
+
 
 /** AI Matching / Graph service — Workflow 2: GET /recommendations (not routed through Mentoring API). */
 export function getAiApiBaseUrl(): string {

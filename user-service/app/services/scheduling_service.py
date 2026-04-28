@@ -1,17 +1,39 @@
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from uuid import UUID
 
+import httpx
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models import MenteeProfile, MentorProfile, MentorshipConnection, TimeSlot, User
+from app.models import MenteeProfile, MentorProfile, TimeSlot, User
 from app.services.mentor_pricing import resolve_mentor_session_price
 from app.services.session_booking_request_service import create_session_booking_request
 
 log = logging.getLogger(__name__)
+
+MENTORING_SERVICE_URL = os.getenv(
+    "MENTORING_SERVICE_URL", 
+    "https://mentoring-service-1095720168864-1095720168864.us-central1.run.app"
+)
+
+
+async def _fetch_connections_from_service(user_id: uuid.UUID) -> list[dict]:
+    """Call Mentoring Service to get active connections for a user."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                f"{MENTORING_SERVICE_URL}/api/v1/requests/connections",
+                headers={"X-User-Id": str(user_id)}
+            )
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    return []
 
 
 def _display_name_from_email(email: str | None) -> str:
@@ -26,23 +48,30 @@ async def get_connected_mentors_for_mentee(db: Session, *, user: User) -> list[d
     if not mentee:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentee profile not found")
 
-    q = (
-        db.query(MentorshipConnection, MentorProfile, User)
-        .join(MentorProfile, MentorProfile.id == MentorshipConnection.mentor_id)
-        .join(User, User.id == MentorProfile.user_id)
-        .filter(
-            MentorshipConnection.mentee_id == mentee.id,
-            MentorshipConnection.status == "ACTIVE",
-        )
-        .order_by(User.email.asc())
-    )
-
+    conns = await _fetch_connections_from_service(user.id)
     out: list[dict] = []
-    for conn, mentor, mentor_user in q.all():
+    
+    for conn in conns:
+        # The Mentoring Service returns connections where the user is either mentor or mentee.
+        # We only care about connections where the current user is the MENTEE.
+        if str(conn["mentee_id"]) != str(mentee.id):
+            continue
+            
+        mentor_profile_id = UUID(str(conn["mentor_id"]))
+        row = (
+            db.query(MentorProfile, User)
+            .join(User, User.id == MentorProfile.user_id)
+            .filter(MentorProfile.id == mentor_profile_id)
+            .first()
+        )
+        if not row:
+            continue
+            
+        mentor, mentor_user = row
         cost = resolve_mentor_session_price(db, mentor)
         out.append(
             {
-                "connection_id": conn.id,
+                "connection_id": UUID(str(conn["id"])),
                 "mentor_id": mentor.id,
                 "mentor_name": _display_name_from_email(mentor_user.email),
                 "expertise": mentor.expertise_areas or [],
@@ -51,7 +80,7 @@ async def get_connected_mentors_for_mentee(db: Session, *, user: User) -> list[d
                 "session_credit_cost": cost,
             }
         )
-    return out
+    return sorted(out, key=lambda x: x["mentor_name"])
 
 
 async def get_available_slots_for_mentor(
@@ -64,15 +93,9 @@ async def get_available_slots_for_mentor(
     if not mentee:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentee profile not found")
 
-    conn = (
-        db.query(MentorshipConnection)
-        .filter(
-            MentorshipConnection.mentee_id == mentee.id,
-            MentorshipConnection.status == "ACTIVE",
-        )
-        .filter(MentorshipConnection.mentor_id == mentor_id)
-        .first()
-    )
+    conns = await _fetch_connections_from_service(user.id)
+    conn = next((c for c in conns if str(c["mentor_id"]) == str(mentor_id) and str(c["mentee_id"]) == str(mentee.id)), None)
+    
     if not conn:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not connected to this mentor")
 

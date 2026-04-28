@@ -53,15 +53,15 @@ async def get_connected_mentors_for_mentee(db: Session, *, user: User) -> list[d
     
     for conn in conns:
         # The Mentoring Service returns connections where the user is either mentor or mentee.
-        # We only care about connections where the current user is the MENTEE.
-        if str(conn["mentee_id"]) != str(mentee.id):
+        # We use mentor_user_id/mentee_user_id for reliable mapping across services.
+        if str(conn["mentee_user_id"]) != str(user.id):
             continue
             
-        mentor_profile_id = UUID(str(conn["mentor_id"]))
+        mentor_user_id = UUID(str(conn["mentor_user_id"]))
         row = (
             db.query(MentorProfile, User)
             .join(User, User.id == MentorProfile.user_id)
-            .filter(MentorProfile.id == mentor_profile_id)
+            .filter(User.id == mentor_user_id)
             .first()
         )
         if not row:
@@ -94,7 +94,11 @@ async def get_available_slots_for_mentor(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentee profile not found")
 
     conns = await _fetch_connections_from_service(user.id)
-    conn = next((c for c in conns if str(c["mentor_id"]) == str(mentor_id) and str(c["mentee_id"]) == str(mentee.id)), None)
+    conn = None
+    for c in conns:
+        if str(c["mentee_user_id"]) == str(user.id) and str(c["mentor_user_id"]) == str(mentor_id):
+            conn = c
+            break
     
     if not conn:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not connected to this mentor")

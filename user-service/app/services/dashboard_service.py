@@ -110,17 +110,17 @@ async def resolve_connection(
     )
     
     if eff == "mentor" and mentor_profile:
-        # Verify the connection matches this mentor profile
+        # Verify the connection matches this mentor by user_id
         for c in conns:
-            if str(c["mentor_id"]) == str(mentor_profile.id):
+            if str(c["mentor_user_id"]) == str(user.id):
                 return c, True
     
     if eff == "mentee" and mentee_profile:
-        # Verify the connection matches this mentee profile
+        # Verify the connection matches this mentee by user_id
         for c in conns:
-            if str(c["mentee_id"]) == str(mentee_profile.id):
+            if str(c["mentee_user_id"]) == str(user.id):
                 return c, False
-
+    
     return None, None
 
 
@@ -133,7 +133,7 @@ def _session_price_for_row(
         return int(row.price_charged)
     mp = (
         db.query(MentorProfile)
-        .filter(MentorProfile.id == UUID(str(sess_conn["mentor_id"])))
+        .filter(MentorProfile.user_id == UUID(str(sess_conn["mentor_user_id"])))
         .one()
     )
     return resolve_mentor_session_price(db, mp)
@@ -143,10 +143,10 @@ def _mentor_mentee_brief(
     db: Session,
     sess_conn: dict,
 ) -> tuple[dict, dict]:
-    mentor_profile_id = UUID(str(sess_conn["mentor_id"]))
-    mentee_profile_id = UUID(str(sess_conn["mentee_id"]))
-    mp = db.query(MentorProfile).filter(MentorProfile.id == mentor_profile_id).one()
-    me = db.query(MenteeProfile).filter(MenteeProfile.id == mentee_profile_id).one()
+    mentor_user_id = UUID(str(sess_conn["mentor_user_id"]))
+    mentee_user_id = UUID(str(sess_conn["mentee_user_id"]))
+    mp = db.query(MentorProfile).filter(MentorProfile.user_id == mentor_user_id).one()
+    me = db.query(MenteeProfile).filter(MenteeProfile.user_id == mentee_user_id).one()
     mentor_user = db.query(User).filter(User.id == mp.user_id).one()
     mentee_user = db.query(User).filter(User.id == me.user_id).one()
     mentor_brief = {
@@ -168,25 +168,11 @@ def _partner_user_for_connection(
     viewer_is_mentor: bool,
 ) -> User | None:
     if viewer_is_mentor:
-        mentee_profile_id = UUID(str(conn["mentee_id"]))
-        mp = (
-            db.query(MenteeProfile)
-            .filter(MenteeProfile.id == mentee_profile_id)
-            .first()
-        )
-        if not mp:
-            return None
-        return db.query(User).filter(User.id == mp.user_id).first()
+        mentee_user_id = UUID(str(conn["mentee_user_id"]))
+        return db.query(User).filter(User.id == mentee_user_id).first()
     
-    mentor_profile_id = UUID(str(conn["mentor_id"]))
-    mp = (
-        db.query(MentorProfile)
-        .filter(MentorProfile.id == mentor_profile_id)
-        .first()
-    )
-    if not mp:
-        return None
-    return db.query(User).filter(User.id == mp.user_id).first()
+    mentor_user_id = UUID(str(conn["mentor_user_id"]))
+    return db.query(User).filter(User.id == mentor_user_id).first()
 
 
 async def _active_connection_ids_for_viewer(

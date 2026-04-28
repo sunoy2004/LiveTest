@@ -5,7 +5,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:123456@/user_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db",
+    "postgresql://postgres:123456@/user_db?host=/cloudsql/yanc-website%3Aus-central1%3Amentor-mentee-db",
 )
 
 

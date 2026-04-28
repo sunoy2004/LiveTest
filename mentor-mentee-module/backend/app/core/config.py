@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # Env: DATABASE_URL (pydantic-settings default for field database_url)
-    database_url: str = "postgresql+asyncpg://postgres:123456@/user_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db"
+    database_url: str = "postgresql+asyncpg://postgres:123456@/user_db?host=/cloudsql/yanc-website%3Aus-central1%3Amentor-mentee-db"
 
     api_v1_prefix: str = "/api/v1"
 

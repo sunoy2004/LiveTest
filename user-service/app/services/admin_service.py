@@ -104,81 +104,9 @@ def list_admin_mentees(db: Session, *, limit: int) -> list[AdminMenteeListItem]:
 
 
 async def list_admin_connections(db: Session, *, limit: int) -> list[AdminConnectionItem]:
-    # --- CROSS-SERVICE BRIDGE ---
-    from app.services.mentoring_client import get_active_connections_from_mentoring_service
-    # For admin, we need to fetch for all users or just get the global list.
-    # Since our bridge get_active_connections takes a user_id, we can either 
-    # update the bridge or call it for the current list of mentees.
-    # A better way is to call a global admin list on the mentoring service.
-    
-    import os
-    import httpx
-    MENTORING_SERVICE_URL = os.getenv("MENTORING_SERVICE_URL", "http://localhost:8000")
-    url = f"{MENTORING_SERVICE_URL}/api/v1/requests/admin/connections"
-    
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url)
-            if response.status_code == 200:
-                remote_rows = response.json()
-                out: list[AdminConnectionItem] = []
-                for r in remote_rows:
-                    m_uid = uuid.UUID(str(r["mentor_user_id"]))
-                    me_uid = uuid.UUID(str(r["mentee_user_id"]))
-                    
-                    # Enrich with local user data or create stub if missing
-                    m_user = db.query(User).filter(User.id == m_uid).first()
-                    if not m_user:
-                        m_email = r.get("mentor_email") or f"mentor_{str(m_uid)[:8]}@shadow.com"
-                        m_user = User(id=m_uid, email=m_email, is_admin=False)
-                        db.add(m_user)
-                        db.flush()
-                        # Also create profile stub so joins work
-                        if not db.query(MentorProfile).filter(MentorProfile.id == uuid.UUID(str(r["mentor_id"]))).first():
-                            db.add(MentorProfile(id=uuid.UUID(str(r["mentor_id"])), user_id=m_uid))
-                            db.flush()
-                            
-                    me_user = db.query(User).filter(User.id == me_uid).first()
-                    if not me_user:
-                        me_email = r.get("mentee_email") or f"mentee_{str(me_uid)[:8]}@shadow.com"
-                        me_user = User(id=me_uid, email=me_email, is_admin=False)
-                        db.add(me_user)
-                        db.flush()
-                        if not db.query(MenteeProfile).filter(MenteeProfile.id == uuid.UUID(str(r["mentee_id"]))).first():
-                            db.add(MenteeProfile(id=uuid.UUID(str(r["mentee_id"])), user_id=me_uid))
-                            db.flush()
-                    
-                    if not db.query(MentorshipConnection).filter(MentorshipConnection.id == uuid.UUID(str(r["id"]))).first():
-                        db.add(MentorshipConnection(
-                            id=uuid.UUID(str(r["id"])),
-                            mentor_id=m_user.mentor_profile[0].id if m_user.mentor_profile else uuid.UUID(str(r["mentor_id"])),
-                            mentee_id=me_user.mentee_profile[0].id if me_user.mentee_profile else uuid.UUID(str(r["mentee_id"])),
-                            status=r["status"]
-                        ))
-                        db.commit()
-                    
-                    out.append(
-                        AdminConnectionItem(
-                            connection_id=uuid.UUID(str(r["id"])),
-                            mentor_profile_id=uuid.UUID(str(r["mentor_id"])),
-                            mentee_profile_id=uuid.UUID(str(r["mentee_id"])),
-                            mentor_user_id=m_uid,
-                            mentee_user_id=me_uid,
-                            mentor_email=r.get("mentor_email") or (m_user.email if m_user else ""),
-                            mentee_email=r.get("mentee_email") or (me_user.email if me_user else ""),
-                            status=r["status"],
-                        )
-                    )
-                return out
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error("BRIDGE FAILURE: Could not reach Mentorship Service at %s. Error: %s", url, e)
-    # --- END BRIDGE ---
-
     MentorUser = aliased(User)
     MenteeUser = aliased(User)
-    # ... fallback to local
+    # fetch from local DB
     rows = (
         db.query(
             MentorshipConnection,

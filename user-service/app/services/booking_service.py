@@ -23,18 +23,10 @@ async def list_open_slots_for_connection(
     user: User,
     connection_id: UUID,
 ) -> list[TimeSlot]:
-    from app.services.mentoring_client import get_active_connections_from_mentoring_service
-    remotes = await get_active_connections_from_mentoring_service(user.id)
-    found = next((c for c in remotes if uuid.UUID(str(c["id"])) == connection_id), None)
-    
-    if found:
-        mentor_id = uuid.UUID(str(found["mentor_id"]))
-    else:
-        # Fallback to local
-        conn = db.query(MentorshipConnection).filter(MentorshipConnection.id == connection_id).first()
-        if not conn:
-             raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
-        mentor_id = conn.mentor_id
+    conn = db.query(MentorshipConnection).filter(MentorshipConnection.id == connection_id).first()
+    if not conn:
+         raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
+    mentor_id = conn.mentor_id
 
     return (
         db.query(TimeSlot)
@@ -45,30 +37,19 @@ async def list_open_slots_for_connection(
 
 
 async def mentee_booking_context(db: Session, *, user: User) -> dict | None:
-    from app.services.mentoring_client import get_active_connections_from_mentoring_service
-    remotes = await get_active_connections_from_mentoring_service(user.id)
-    if not remotes:
-        # Fallback to local
-        me = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
-        if not me:
-            return None
-        conn = (
-            db.query(MentorshipConnection)
-            .filter(MentorshipConnection.mentee_id == me.id, MentorshipConnection.status == "ACTIVE")
-            .first()
-        )
-        if not conn:
-            return None
-        conn_id = conn.id
-        mentor_id = conn.mentor_id
-        cached_credits = me.cached_credit_score
-    else:
-        # Use first remote connection for context
-        found = remotes[0]
-        conn_id = uuid.UUID(str(found["id"]))
-        mentor_id = uuid.UUID(str(found["mentor_id"]))
-        me = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
-        cached_credits = me.cached_credit_score if me else 0
+    me = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
+    if not me:
+        return None
+    conn = (
+        db.query(MentorshipConnection)
+        .filter(MentorshipConnection.mentee_id == me.id, MentorshipConnection.status == "ACTIVE")
+        .first()
+    )
+    if not conn:
+        return None
+    conn_id = conn.id
+    mentor_id = conn.mentor_id
+    cached_credits = me.cached_credit_score
 
     mentor = db.query(MentorProfile).filter(MentorProfile.id == mentor_id).first()
     m_user = db.query(User).filter(User.id == mentor.user_id).first() if mentor else None

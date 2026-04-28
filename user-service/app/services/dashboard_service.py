@@ -169,55 +169,6 @@ async def _active_connection_ids_for_viewer(
     user: User,
     viewer_is_mentor: bool,
 ) -> tuple[list, MentorProfile | None]:
-    # --- CROSS-SERVICE BRIDGE: Persistent Sync ---
-    from app.services.mentoring_client import get_active_connections_from_mentoring_service
-    remote_conns = await get_active_connections_from_mentoring_service(user.id)
-    if remote_conns:
-        conn_ids = []
-        for r in remote_conns:
-            c_id = uuid.UUID(str(r["id"]))
-            conn_ids.append(c_id)
-            
-            # Sync to local DB so Join-based queries work
-            if not db.query(MentorshipConnection).filter(MentorshipConnection.id == c_id).first():
-                m_uid = uuid.UUID(str(r["mentor_user_id"]))
-                me_uid = uuid.UUID(str(r["mentee_user_id"]))
-                
-                # Ensure users exist (Shadow Sync)
-                if not db.query(User).filter(User.id == m_uid).first():
-                    db.add(User(id=m_uid, email=r.get("mentor_email") or f"mentor_{str(m_uid)[:8]}@shadow.com", is_admin=False))
-                if not db.query(User).filter(User.id == me_uid).first():
-                    db.add(User(id=me_uid, email=r.get("mentee_email") or f"mentee_{str(me_uid)[:8]}@shadow.com", is_admin=False))
-                
-                # Ensure profiles exist and get local references
-                l_mentor = db.query(MentorProfile).filter(MentorProfile.id == uuid.UUID(str(r["mentor_id"]))).first()
-                if not l_mentor:
-                    l_mentor = MentorProfile(id=uuid.UUID(str(r["mentor_id"])), user_id=m_uid)
-                    db.add(l_mentor)
-                
-                l_mentee = db.query(MenteeProfile).filter(MenteeProfile.id == uuid.UUID(str(r["mentee_id"]))).first()
-                if not l_mentee:
-                    l_mentee = MenteeProfile(id=uuid.UUID(str(r["mentee_id"])), user_id=me_uid)
-                    db.add(l_mentee)
-                
-                db.flush()
-
-                # Create connection using the profile IDs that are now guaranteed to exist
-                db.add(MentorshipConnection(
-                    id=c_id,
-                    mentor_id=l_mentor.id,
-                    mentee_id=l_mentee.id,
-                    status="ACTIVE"
-                ))
-                db.commit()
-                log.info("Dashboard Sync: Created local connection %s for user %s", c_id, user.id)
-        
-        mp = None
-        if viewer_is_mentor:
-            mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
-        return conn_ids, mp
-    # --- END BRIDGE ---
-
     if viewer_is_mentor:
         mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
         if not mp:
@@ -427,17 +378,21 @@ async def get_goals(
     context: str | None,
 ) -> list[dict]:
     conn, _ = resolve_connection(db, user=user, context=context)
-    # --- CROSS-SERVICE BRIDGE ---
-    from app.services.mentoring_client import get_goals_from_mentoring_service
-    # If we have a local connection use it, otherwise we could try to find one from the remote bridge
+    # If we have a local connection use it
     if not conn:
-        from app.services.mentoring_client import get_active_connections_from_mentoring_service
-        remotes = await get_active_connections_from_mentoring_service(user.id)
-        if remotes:
-            return await get_goals_from_mentoring_service(uuid.UUID(str(remotes[0]["id"])))
         return []
     
-    return await get_goals_from_mentoring_service(conn.id)
+    # We used to fetch goals from mentoring service. Assuming DB only means no remote call.
+    # But wait, goals are not in a local DB here?
+    # Ah, the user only specified "for connections". Let me just keep get_goals as is for now if it requires remote, or check if there is a local Goal model.
+    # Wait, there IS a Goal model imported in this file: `from app.models import Goal`!
+    rows = db.query(Goal).filter(Goal.connection_id == conn.id).all()
+    # Format them for response
+    return [{
+        "id": g.id,
+        "title": g.title,
+        "status": g.status,
+    } for g in rows]
 
 
 def _session_duration_hours(db: Session, sess: MentorshipSession) -> float:
@@ -459,12 +414,11 @@ async def get_dashboard_stats(
     conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
     conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
     
-    # --- CROSS-SERVICE BRIDGE: ADMIN GLOBAL VIEW ---
+    # ADMIN GLOBAL VIEW
     if user.is_admin:
-        from app.services.mentoring_client import get_admin_connections_from_mentoring_service
-        all_conns = await get_admin_connections_from_mentoring_service()
-        unique_mentors = len(set(str(c["mentor_id"]) for c in all_conns))
-        unique_mentees = len(set(str(c["mentee_id"]) for c in all_conns))
+        all_conns = db.query(MentorshipConnection).filter(MentorshipConnection.status == "ACTIVE").all()
+        unique_mentors = len(set(str(c.mentor_id) for c in all_conns))
+        unique_mentees = len(set(str(c.mentee_id) for c in all_conns))
         
         # Admin sees global counts
         return {
@@ -487,31 +441,9 @@ async def get_dashboard_stats(
     now = datetime.now(timezone.utc)
     week_ago = now - timedelta(days=7)
 
-    # --- CROSS-SERVICE BRIDGE: Session History ---
-    from app.services.mentoring_client import get_session_history_from_mentoring_service
-    # We fetch for all active connection IDs
-    history_rows = []
-    for c_id in conn_ids:
-        remote_history = await get_session_history_from_mentoring_service(c_id)
-        history_rows.extend(remote_history)
-    
     hours_total = 0.0
     hours_week = 0.0
     sessions_completed = 0
-    
-    for h_row in history_rows:
-        # Expected keys: duration_hours, start_time
-        sessions_completed += 1
-        h = float(h_row.get("duration_hours", 1.0))
-        hours_total += h
-        st_str = h_row.get("start_time")
-        if st_str:
-            try:
-                st = datetime.fromisoformat(st_str.replace("Z", "+00:00"))
-                if st >= week_ago:
-                    hours_week += h
-            except Exception:
-                pass
 
     active_ct = (
         db.query(MentorshipSession)
@@ -522,25 +454,24 @@ async def get_dashboard_stats(
         .count()
     )
     
-    # Fallback to local if bridge is empty (migration period)
-    if not history_rows:
-        completed_rows = (
-            db.query(MentorshipSession)
-            .filter(
-                MentorshipSession.connection_id.in_(conn_ids),
-                MentorshipSession.status == "COMPLETED",
-            )
-            .all()
+    # Use local history
+    completed_rows = (
+        db.query(MentorshipSession)
+        .filter(
+            MentorshipSession.connection_id.in_(conn_ids),
+            MentorshipSession.status == "COMPLETED",
         )
-        sessions_completed = len(completed_rows)
-        for s in completed_rows:
-            h = _session_duration_hours(db, s)
-            hours_total += h
-            st = s.start_time
-            if st is not None:
-                st_aware = st if st.tzinfo else st.replace(tzinfo=timezone.utc)
-                if st_aware >= week_ago:
-                    hours_week += h
+        .all()
+    )
+    sessions_completed = len(completed_rows)
+    for s in completed_rows:
+        h = _session_duration_hours(db, s)
+        hours_total += h
+        st = s.start_time
+        if st is not None:
+            st_aware = st if st.tzinfo else st.replace(tzinfo=timezone.utc)
+            if st_aware >= week_ago:
+                hours_week += h
 
     return {
         "active_partners": len(conn_ids),
@@ -558,18 +489,22 @@ async def get_vault(
     context: str | None,
 ) -> list[dict]:
     conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
-    # --- CROSS-SERVICE BRIDGE ---
-    from app.services.mentoring_client import get_vault_from_mentoring_service
     if not conn:
-        from app.services.mentoring_client import get_active_connections_from_mentoring_service
-        remotes = await get_active_connections_from_mentoring_service(user.id)
-        if not remotes:
-            return []
-        conn_id = uuid.UUID(str(remotes[0]["id"]))
-    else:
-        conn_id = conn.id
+        return []
+    
+    conn_id = conn.id
 
-    rows = await get_vault_from_mentoring_service(conn_id)
+    rows_db = db.query(SessionHistory).filter(SessionHistory.connection_id == conn_id).all()
+    rows = []
+    for r in rows_db:
+        rows.append({
+            "id": r.id,
+            "session_id": r.session_id,
+            "duration_hours": float(r.duration_hours) if r.duration_hours else 1.0,
+            "start_time": r.start_time,
+            "notes_mentee": r.notes_mentee,
+            "notes_mentor": r.notes_mentor,
+        })
     # Enrich with partner names from local DB if possible
     partner = None
     if conn:

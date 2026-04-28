@@ -56,10 +56,11 @@ async def invalidate_all_recommendation_caches() -> int:
     r = _get_redis()
     n = 0
     try:
-        keys = await r.keys("rec:*")
-        if keys:
-            await r.delete(*keys)
-            n = len(keys)
+        async for k in r.scan_iter(match="rec:*", count=200):
+            if isinstance(k, bytes):
+                k = k.decode()
+            await r.delete(k)
+            n += 1
     except Exception as e:  # noqa: BLE001
         log.warning("cache invalidate-all failed: %s", e)
     log.info("invalidated %d recommendation cache keys (full flush)", n)

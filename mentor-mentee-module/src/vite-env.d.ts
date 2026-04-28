@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  VITE_MFE_REMOTE_PORT: string;
   /** User Service (identity + domain profiles) — GET /profile/full, POST /login */
   readonly VITE_USER_SERVICE_URL?: string;
   /** Mentoring FastAPI base URL (API Gateway origin); paths use /api/v1/... */

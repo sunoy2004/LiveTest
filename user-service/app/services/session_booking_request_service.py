@@ -47,41 +47,12 @@ async def create_session_booking_request(
         .filter(MentorshipConnection.id == connection_id)
         .one_or_none()
     )
-    # --- CROSS-SERVICE BRIDGE: Auto-Sync ---
     if not conn:
-        from app.services.mentoring_client import get_active_connections_from_mentoring_service
-        remotes = await get_active_connections_from_mentoring_service(user.id)
-        found = next((c for c in remotes if uuid.UUID(str(c["id"])) == connection_id), None)
-        # Sync to local DB so existing Join-based queries work
-        # CRITICAL: If databases were seeded separately, profile IDs won't match.
-        # We must look up the local profile by the GLOBAL user_id.
-        m_uid = uuid.UUID(str(found["mentor_user_id"]))
-        me_uid = uuid.UUID(str(found["mentee_user_id"]))
-        
-        local_mentor = db.query(MentorProfile).filter(MentorProfile.user_id == m_uid).first()
-        local_mentee = db.query(MenteeProfile).filter(MenteeProfile.user_id == me_uid).first()
-        
-        if not local_mentor or not local_mentee:
-             raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection found remotely but local profiles missing for these user IDs")
-
-        mentor_id = local_mentor.id
-        mentee_id = local_mentee.id
-        
-        conn = MentorshipConnection(
-            id=connection_id,
-            mentor_id=mentor_id,
-            mentee_id=mentee_id,
-            status="ACTIVE"
-        )
-        db.add(conn)
-        db.flush()
-        log.info("Synced remote connection %s to local DB using user_ids (M:%s, Me:%s)", connection_id, m_uid, me_uid)
-    else:
-        if conn.status != "ACTIVE":
-             raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection is inactive")
-        mentor_id = conn.mentor_id
-        mentee_id = conn.mentee_id
-    # --- END BRIDGE ---
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
+    if conn.status != "ACTIVE":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection is inactive")
+    mentor_id = conn.mentor_id
+    mentee_id = conn.mentee_id
 
     mentee_profile = (
         db.query(MenteeProfile)

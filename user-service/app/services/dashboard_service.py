@@ -342,7 +342,7 @@ async def get_upcoming_session(
     user: User,
     context: str | None,
 ) -> dict | None:
-    conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
+    conn, viewer_is_mentor = await resolve_connection(db, user=user, context=context)
     conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
     if not conn_ids:
         return None
@@ -365,7 +365,7 @@ async def get_upcoming_sessions(
     context: str | None,
     limit: int = 5,
 ) -> list[dict]:
-    conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
+    conn, viewer_is_mentor = await resolve_connection(db, user=user, context=context)
     conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
     if not conn_ids:
         return []
@@ -387,7 +387,7 @@ async def get_goals(
     user: User,
     context: str | None,
 ) -> list[dict]:
-    conn, _ = resolve_connection(db, user=user, context=context)
+    conn, _ = await resolve_connection(db, user=user, context=context)
     if not conn:
         return []
     
@@ -489,7 +489,7 @@ async def get_vault(
     user: User,
     context: str | None,
 ) -> list[dict]:
-    conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
+    conn, viewer_is_mentor = await resolve_connection(db, user=user, context=context)
     if not conn:
         return []
     

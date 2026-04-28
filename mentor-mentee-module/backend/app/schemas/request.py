@@ -27,6 +27,8 @@ class MentorshipRequestRead(BaseModel):
     id: uuid.UUID
     mentee_id: uuid.UUID
     mentor_id: uuid.UUID
+    mentee_user_id: uuid.UUID | None = None
+    mentor_user_id: uuid.UUID | None = None
     status: MentorshipRequestStatus
     intro_message: str
     mentee_name: str | None = None

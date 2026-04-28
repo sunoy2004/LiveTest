@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import os
 import uuid
+from uuid import UUID
 import httpx
 from sqlalchemy.orm import Session
 
@@ -132,7 +133,7 @@ def _session_price_for_row(
         return int(row.price_charged)
     mp = (
         db.query(MentorProfile)
-        .filter(MentorProfile.id == uuid.UUID(str(sess_conn["mentor_id"])))
+        .filter(MentorProfile.id == UUID(str(sess_conn["mentor_id"])))
         .one()
     )
     return resolve_mentor_session_price(db, mp)
@@ -142,8 +143,8 @@ def _mentor_mentee_brief(
     db: Session,
     sess_conn: dict,
 ) -> tuple[dict, dict]:
-    mentor_profile_id = uuid.UUID(str(sess_conn["mentor_id"]))
-    mentee_profile_id = uuid.UUID(str(sess_conn["mentee_id"]))
+    mentor_profile_id = UUID(str(sess_conn["mentor_id"]))
+    mentee_profile_id = UUID(str(sess_conn["mentee_id"]))
     mp = db.query(MentorProfile).filter(MentorProfile.id == mentor_profile_id).one()
     me = db.query(MenteeProfile).filter(MenteeProfile.id == mentee_profile_id).one()
     mentor_user = db.query(User).filter(User.id == mp.user_id).one()
@@ -167,7 +168,7 @@ def _partner_user_for_connection(
     viewer_is_mentor: bool,
 ) -> User | None:
     if viewer_is_mentor:
-        mentee_profile_id = uuid.UUID(str(conn["mentee_id"]))
+        mentee_profile_id = UUID(str(conn["mentee_id"]))
         mp = (
             db.query(MenteeProfile)
             .filter(MenteeProfile.id == mentee_profile_id)
@@ -177,7 +178,7 @@ def _partner_user_for_connection(
             return None
         return db.query(User).filter(User.id == mp.user_id).first()
     
-    mentor_profile_id = uuid.UUID(str(conn["mentor_id"]))
+    mentor_profile_id = UUID(str(conn["mentor_id"]))
     mp = (
         db.query(MentorProfile)
         .filter(MentorProfile.id == mentor_profile_id)
@@ -193,7 +194,7 @@ async def _active_connection_ids_for_viewer(
     *,
     user: User,
     viewer_is_mentor: bool,
-) -> tuple[list[uuid.UUID], MentorProfile | None]:
+) -> tuple[list[UUID], MentorProfile | None]:
     conns = await _fetch_connections_from_service(user.id)
     if not conns:
         return [], None
@@ -203,13 +204,13 @@ async def _active_connection_ids_for_viewer(
         if not mp:
             return [], None
         # The service already filtered by user_id via header, but we filter by profile_id to be safe
-        ids = [uuid.UUID(str(c["id"])) for c in conns if str(c["mentor_id"]) == str(mp.id)]
+        ids = [UUID(str(c["id"])) for c in conns if str(c["mentor_id"]) == str(mp.id)]
         return ids, mp
     else:
         mep = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
         if not mep:
             return [], None
-        ids = [uuid.UUID(str(c["id"])) for c in conns if str(c["mentee_id"]) == str(mep.id)]
+        ids = [UUID(str(c["id"])) for c in conns if str(c["mentee_id"]) == str(mep.id)]
         return ids, None
 
 
@@ -496,7 +497,7 @@ async def get_vault(
     rows_db = (
         db.query(SessionHistory, MentorshipSession)
         .join(MentorshipSession, MentorshipSession.id == SessionHistory.session_id)
-        .filter(MentorshipSession.connection_id == uuid.UUID(str(conn["id"])))
+        .filter(MentorshipSession.connection_id == UUID(str(conn["id"])))
         .all()
     )
     

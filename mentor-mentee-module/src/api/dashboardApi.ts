@@ -19,7 +19,7 @@ export async function fetchDashboardUpcoming(
   context: "mentor" | "mentee",
 ): Promise<UpcomingSessionResponse> {
   const q = new URLSearchParams({ context });
-  const res = await fetch(`${getUserServiceBase()}/dashboard/upcoming-session?${q}`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/dashboard/upcoming-session?${q}`, {
     headers: dashboardHeaders(token),
   });
   if (!res.ok) {
@@ -35,7 +35,7 @@ export async function fetchDashboardUpcomingSessions(
   limit = 5,
 ): Promise<UpcomingSessionItemResponse[]> {
   const q = new URLSearchParams({ context, limit: String(limit) });
-  const res = await fetch(`${getUserServiceBase()}/dashboard/upcoming-sessions?${q}`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/dashboard/upcoming-sessions?${q}`, {
     headers: dashboardHeaders(token),
   });
   if (!res.ok) {
@@ -50,7 +50,7 @@ export async function fetchDashboardGoals(
   context: "mentor" | "mentee",
 ): Promise<GoalItemResponse[]> {
   const q = new URLSearchParams({ context });
-  const res = await fetch(`${getUserServiceBase()}/dashboard/goals?${q}`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/dashboard/goals?${q}`, {
     headers: dashboardHeaders(token),
   });
   if (!res.ok) {
@@ -65,7 +65,7 @@ export async function fetchDashboardVault(
   context: "mentor" | "mentee",
 ): Promise<VaultItemResponse[]> {
   const q = new URLSearchParams({ context });
-  const res = await fetch(`${getUserServiceBase()}/dashboard/vault?${q}`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/dashboard/vault?${q}`, {
     headers: dashboardHeaders(token),
   });
   if (!res.ok) {
@@ -80,7 +80,7 @@ export async function fetchDashboardStats(
   context: "mentor" | "mentee",
 ): Promise<DashboardStatsResponse> {
   const q = new URLSearchParams({ context });
-  const res = await fetch(`${getUserServiceBase()}/dashboard/stats?${q}`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/dashboard/stats?${q}`, {
     headers: dashboardHeaders(token),
   });
   if (!res.ok) {

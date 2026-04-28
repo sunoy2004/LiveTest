@@ -11,6 +11,15 @@ from app.services import scheduling_service, booking_service
 router = APIRouter()
 
 
+@router.get("/connected-mentors")
+async def get_connected_mentors(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_api_v1_user),
+):
+    """List mentors the current mentee is connected to."""
+    return await scheduling_service.get_connected_mentors_for_mentee(db, user=user)
+
+
 @router.get("/availability")
 async def get_availability(
     mentor_id: UUID = Query(...),

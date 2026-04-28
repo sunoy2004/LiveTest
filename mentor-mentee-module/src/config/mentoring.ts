@@ -67,7 +67,7 @@ export const mentoringPaths = {
   /** Workflow 2 — mentorship request pitch (Gateway); Architecture lists domain under relationship engine. */
   requests: `${MENTORING_API_PREFIX}/requests`,
   requestStatus: (requestId: string) =>
-    `${MENTORING_API_PREFIX}/requests/${encodeURIComponent(requestId)}/status`,
+    `${MENTORING_API_PREFIX}/requests/${encodeURIComponent(requestId)}`,
   sessionHistory: (sessionId: string) =>
     `${MENTORING_API_PREFIX}/sessions/${encodeURIComponent(sessionId)}/history`,
   /** User Service admin surface (not under mentoring prefix); use with `VITE_USER_SERVICE_URL`. */

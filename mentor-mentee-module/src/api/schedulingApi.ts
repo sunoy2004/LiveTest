@@ -12,7 +12,7 @@ function headers(token: string): HeadersInit {
 export async function fetchSchedulingContext(
   token: string,
 ): Promise<BookingSchedulingContext> {
-  const res = await fetch(`${getUserServiceBase()}/scheduling/context`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/context`, {
     headers: headers(token),
   });
   if (!res.ok) {
@@ -26,7 +26,7 @@ export async function bookSession(
   token: string,
   body: { connection_id: string; slot_id: string; agreed_cost: number },
 ): Promise<BookSessionResponse> {
-  const res = await fetch(`${getUserServiceBase()}/scheduling/book`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/book`, {
     method: "POST",
     headers: headers(token),
     body: JSON.stringify(body),

@@ -18,7 +18,7 @@ function headers(token: string): HeadersInit {
 export async function fetchConnectedMentors(
   token: string,
 ): Promise<ConnectedMentorItem[]> {
-  const res = await fetch(`${getUserServiceBase()}/mentoring/connected-mentors`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/connected-mentors`, {
     headers: headers(token),
   });
   if (!res.ok) {
@@ -33,7 +33,7 @@ export async function fetchMentorAvailability(
   mentorId: string,
 ): Promise<AvailableSlotItem[]> {
   const q = new URLSearchParams({ mentor_id: mentorId });
-  const res = await fetch(`${getUserServiceBase()}/mentoring/availability?${q}`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/availability?${q}`, {
     headers: headers(token),
   });
   if (!res.ok) {
@@ -48,7 +48,7 @@ export async function fetchMentorProfileDetail(
   mentorProfileId: string,
 ): Promise<MentorProfileDetail> {
   const res = await fetch(
-    `${getUserServiceBase()}/mentoring/mentor/${encodeURIComponent(mentorProfileId)}`,
+    `${getUserServiceBase()}/api/v1/profiles/mentor/${encodeURIComponent(mentorProfileId)}`,
     { headers: headers(token) },
   );
   if (!res.ok) {
@@ -62,7 +62,7 @@ export async function bookSessionSimple(
   token: string,
   body: { connection_id: string; slot_id: string },
 ): Promise<BookSessionSimpleResponse> {
-  const res = await fetch(`${getUserServiceBase()}/mentoring/book`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/book`, {
     method: "POST",
     headers: headers(token),
     body: JSON.stringify(body),
@@ -77,7 +77,7 @@ export async function bookSessionSimple(
 export async function fetchIncomingSessionRequests(
   token: string,
 ): Promise<IncomingSessionRequestItem[]> {
-  const res = await fetch(`${getUserServiceBase()}/mentoring/incoming-session-requests`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/sessions/incoming-requests`, {
     headers: headers(token),
   });
   if (!res.ok) {
@@ -92,7 +92,7 @@ export async function acceptSessionRequest(
   requestId: string,
 ): Promise<{ session_id: string; status: string; meeting_url: string | null; start_time: string }> {
   const res = await fetch(
-    `${getUserServiceBase()}/mentoring/session-requests/${encodeURIComponent(requestId)}/accept`,
+    `${getUserServiceBase()}/api/v1/sessions/requests/${encodeURIComponent(requestId)}/accept`,
     { method: "POST", headers: headers(token) },
   );
   if (!res.ok) {
@@ -109,7 +109,7 @@ export async function acceptSessionRequest(
 
 export async function rejectSessionRequest(token: string, requestId: string): Promise<void> {
   const res = await fetch(
-    `${getUserServiceBase()}/mentoring/session-requests/${encodeURIComponent(requestId)}/reject`,
+    `${getUserServiceBase()}/api/v1/sessions/requests/${encodeURIComponent(requestId)}/reject`,
     { method: "POST", headers: headers(token) },
   );
   if (!res.ok) {

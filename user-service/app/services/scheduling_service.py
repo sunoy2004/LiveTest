@@ -22,26 +22,28 @@ def _display_name_from_email(email: str | None) -> str:
 
 
 async def get_connected_mentors_for_mentee(db: Session, *, user: User) -> list[dict]:
-    from app.services.mentoring_client import get_active_connections_from_mentoring_service
-    remotes = await get_active_connections_from_mentoring_service(user.id)
-    
+    mentee = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
+    if not mentee:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentee profile not found")
+
+    q = (
+        db.query(MentorshipConnection, MentorProfile, User)
+        .join(MentorProfile, MentorProfile.id == MentorshipConnection.mentor_id)
+        .join(User, User.id == MentorProfile.user_id)
+        .filter(
+            MentorshipConnection.mentee_id == mentee.id,
+            MentorshipConnection.status == "ACTIVE",
+        )
+        .order_by(User.email.asc())
+    )
+
     out: list[dict] = []
-    for r in remotes:
-        m_id = uuid.UUID(str(r["mentor_id"]))
-        conn_id = uuid.UUID(str(r["id"]))
-        
-        mentor = db.query(MentorProfile).filter(MentorProfile.id == m_id).first()
-        if not mentor:
-            continue
-        mentor_user = db.query(User).filter(User.id == mentor.user_id).first()
-        if not mentor_user:
-            continue
-            
+    for conn, mentor, mentor_user in q.all():
         cost = resolve_mentor_session_price(db, mentor)
         out.append(
             {
-                "connection_id": conn_id,
-                "mentor_id": m_id,
+                "connection_id": conn.id,
+                "mentor_id": mentor.id,
                 "mentor_name": _display_name_from_email(mentor_user.email),
                 "expertise": mentor.expertise_areas or [],
                 "total_hours": mentor.total_hours_mentored,
@@ -58,11 +60,22 @@ async def get_available_slots_for_mentor(
     user: User,
     mentor_id: UUID,
 ) -> list[dict]:
-    # Check connection remotely (Source of Truth)
-    from app.services.mentoring_client import get_active_connections_from_mentoring_service
-    remotes = await get_active_connections_from_mentoring_service(user.id)
-    if not any(uuid.UUID(str(r["mentor_id"])) == mentor_id for r in remotes):
+    mentee = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
+    if not mentee:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentee profile not found")
+
+    conn = (
+        db.query(MentorshipConnection)
+        .filter(
+            MentorshipConnection.mentee_id == mentee.id,
+            MentorshipConnection.status == "ACTIVE",
+        )
+        .filter(MentorshipConnection.mentor_id == mentor_id)
+        .first()
+    )
+    if not conn:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not connected to this mentor")
+
 
 
     mentor = db.query(MentorProfile).filter(MentorProfile.id == mentor_id).first()

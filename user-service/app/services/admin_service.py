@@ -104,33 +104,41 @@ def list_admin_mentees(db: Session, *, limit: int) -> list[AdminMenteeListItem]:
 
 
 async def list_admin_connections(db: Session, *, limit: int) -> list[AdminConnectionItem]:
-    from app.services.mentoring_client import get_admin_connections_from_mentoring_service
-    remotes = await get_admin_connections_from_mentoring_service()
-    
+    MentorUser = aliased(User)
+    MenteeUser = aliased(User)
+    # fetch from local DB
+    rows = (
+        db.query(
+            MentorshipConnection,
+            MentorProfile,
+            MenteeProfile,
+            MentorUser,
+            MenteeUser,
+        )
+        .join(MentorProfile, MentorshipConnection.mentor_id == MentorProfile.id)
+        .join(MenteeProfile, MentorshipConnection.mentee_id == MenteeProfile.id)
+        .join(MentorUser, MentorProfile.user_id == MentorUser.id)
+        .join(MenteeUser, MenteeProfile.user_id == MenteeUser.id)
+        .order_by(MentorshipConnection.id.asc())
+        .limit(limit)
+        .all()
+    )
     out: list[AdminConnectionItem] = []
-    # Limit locally as the remote service might return everything
-    for r in remotes[:limit]:
-        conn_id = UUID(str(r["id"]))
-        mentor_id = UUID(str(r["mentor_id"]))
-        mentee_id = UUID(str(r["mentee_id"]))
-        
-        # Fetch user details from local DB
-        mu_id = UUID(str(r["mentor_user_id"]))
-        meu_id = UUID(str(r["mentee_user_id"]))
-        
+    for conn, _mp, _mep, mentor_u, mentee_u in rows:
         out.append(
             AdminConnectionItem(
-                connection_id=conn_id,
-                mentor_profile_id=mentor_id,
-                mentee_profile_id=mentee_id,
-                mentor_user_id=mu_id,
-                mentee_user_id=meu_id,
-                mentor_email=r.get("mentor_email") or "",
-                mentee_email=r.get("mentee_email") or "",
-                status=r.get("status") or "ACTIVE",
+                connection_id=conn.id,
+                mentor_profile_id=conn.mentor_id,
+                mentee_profile_id=conn.mentee_id,
+                mentor_user_id=mentor_u.id,
+                mentee_user_id=mentee_u.id,
+                mentor_email=mentor_u.email or "",
+                mentee_email=mentee_u.email or "",
+                status=conn.status,
             )
         )
     return out
+
 
 
 

@@ -168,25 +168,26 @@ async def _active_connection_ids_for_viewer(
     *,
     user: User,
     viewer_is_mentor: bool,
-) -> tuple[list, MentorProfile | None]:
-    from app.services.mentoring_client import get_active_connections_from_mentoring_service
-    
-    # MANDATORY: Fetch from Mentoring Service (Source of Truth)
-    remotes = await get_active_connections_from_mentoring_service(user.id)
-    conn_ids = [uuid.UUID(str(r["id"])) for r in remotes]
-    
-    mp = None
+) -> tuple[list[UUID], MentorProfile | None]:
     if viewer_is_mentor:
         mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
-        
-    return conn_ids, mp
+        if not mp:
+            return [], None
+        conns = db.query(MentorshipConnection).filter(MentorshipConnection.mentor_id == mp.id, MentorshipConnection.status == "ACTIVE").all()
+        return [c.id for c in conns], mp
+    else:
+        mep = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
+        if not mep:
+            return [], None
+        conns = db.query(MentorshipConnection).filter(MentorshipConnection.mentee_id == mep.id, MentorshipConnection.status == "ACTIVE").all()
+        return [c.id for c in conns], None
 
 
 async def _collect_upcoming_payloads(
     db: Session,
     *,
     viewer_is_mentor: bool,
-    conn_ids: list,
+    conn_ids: list[UUID],
     mentor_profile: MentorProfile | None,
     include_rejected_booking_requests: bool,
     max_items: int,
@@ -209,8 +210,10 @@ async def _collect_upcoming_payloads(
         booking_pairs = (
             db.query(SessionBookingRequest, TimeSlot)
             .join(TimeSlot, TimeSlot.id == SessionBookingRequest.slot_id)
+            .join(MentorshipConnection, MentorshipConnection.id == SessionBookingRequest.connection_id)
             .filter(
-                SessionBookingRequest.connection_id.in_(conn_ids),
+                MentorshipConnection.mentor_id == mentor_profile.id,
+                MentorshipConnection.status == "ACTIVE",
                 SessionBookingRequest.status == "PENDING",
             )
             .order_by(TimeSlot.start_time.asc())
@@ -244,7 +247,6 @@ async def _collect_upcoming_payloads(
             break
         if kind == "session":
             row = payload
-            # In user-service, we still need connection context for names
             sess_conn = db.query(MentorshipConnection).filter(MentorshipConnection.id == row.connection_id).first()
             if not sess_conn:
                 continue
@@ -352,17 +354,14 @@ async def get_goals(
 ) -> list[dict]:
     conn, _ = resolve_connection(db, user=user, context=context)
     if not conn:
-        # Fallback to remote if local resolve failed
-        from app.services.mentoring_client import get_active_connections_from_mentoring_service
-        remotes = await get_active_connections_from_mentoring_service(user.id)
-        if not remotes:
-            return []
-        conn_id = uuid.UUID(str(remotes[0]["id"]))
-    else:
-        conn_id = conn.id
-
-    from app.services.mentoring_client import get_goals_from_mentoring_service
-    return await get_goals_from_mentoring_service(conn_id)
+        return []
+    
+    rows = db.query(Goal).filter(Goal.connection_id == conn.id).all()
+    return [{
+        "id": g.id,
+        "title": g.title,
+        "status": g.status,
+    } for g in rows]
 
 
 def _session_duration_hours(db: Session, sess: MentorshipSession) -> float:
@@ -386,18 +385,16 @@ async def get_dashboard_stats(
     
     # ADMIN GLOBAL VIEW
     if user.is_admin:
-        from app.services.mentoring_client import get_admin_connections_from_mentoring_service
-        all_remotes = await get_admin_connections_from_mentoring_service()
-        
-        unique_mentors = len(set(str(c["mentor_id"]) for c in all_remotes))
-        unique_mentees = len(set(str(c["mentee_id"]) for c in all_remotes))
+        all_conns = db.query(MentorshipConnection).filter(MentorshipConnection.status == "ACTIVE").all()
+        unique_mentors = len(set(str(c.mentor_id) for c in all_conns))
+        unique_mentees = len(set(str(c.mentee_id) for c in all_conns))
         
         return {
             "active_partners": unique_mentors if context != "mentor" else unique_mentees,
             "hours_total": 0.0,
             "hours_this_week": 0.0,
             "sessions_completed": 0,
-            "active_sessions": len(all_remotes),
+            "active_sessions": len(all_conns),
         }
     
     if not conn_ids:
@@ -415,7 +412,6 @@ async def get_dashboard_stats(
     hours_total = 0.0
     hours_week = 0.0
     
-    # We still use local sessions for durations, but based on remote connection IDs
     completed_rows = (
         db.query(MentorshipSession)
         .filter(
@@ -460,23 +456,29 @@ async def get_vault(
 ) -> list[dict]:
     conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
     if not conn:
-        from app.services.mentoring_client import get_active_connections_from_mentoring_service
-        remotes = await get_active_connections_from_mentoring_service(user.id)
-        if not remotes:
-            return []
-        conn_id = uuid.UUID(str(remotes[0]["id"]))
-    else:
-        conn_id = conn.id
-
-    from app.services.mentoring_client import get_vault_from_mentoring_service
-    rows = await get_vault_from_mentoring_service(conn_id)
+        return []
     
-    # Enrich with partner names from local DB if possible
-    partner = None
-    if conn:
-        partner = _partner_user_for_connection(db, conn, viewer_is_mentor=bool(viewer_is_mentor))
+    # Join SessionHistory with MentorshipSession to filter by connection_id
+    rows_db = (
+        db.query(SessionHistory, MentorshipSession)
+        .join(MentorshipSession, MentorshipSession.id == SessionHistory.session_id)
+        .filter(MentorshipSession.connection_id == conn.id)
+        .all()
+    )
     
-    for r in rows:
-        r["partner_name"] = _partner_display_name(partner)
+    partner = _partner_user_for_connection(db, conn, viewer_is_mentor=bool(viewer_is_mentor))
+    partner_name = _partner_display_name(partner)
+    
+    rows = []
+    for history, session in rows_db:
+        rows.append({
+            "session_id": session.id,
+            "start_time": session.start_time,
+            "notes": history.notes_data or {},
+            "mentor_rating": history.mentor_rating,
+            "mentee_rating": history.mentee_rating,
+            "partner_name": partner_name,
+        })
     return rows
+
 

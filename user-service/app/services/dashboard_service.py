@@ -1,6 +1,7 @@
-from __future__ import annotations
-
 from datetime import datetime, timedelta, timezone
+import os
+import uuid
+import httpx
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -41,78 +42,97 @@ def _effective_context(
     return None
 
 
-def resolve_connection(
+MENTORING_SERVICE_URL = os.getenv(
+    "MENTORING_SERVICE_URL", 
+    "https://mentoring-service-1095720168864-1095720168864.us-central1.run.app"
+)
+
+
+async def _fetch_connections_from_service(user_id: uuid.UUID) -> list[dict]:
+    """Call Mentoring Service to get active connections for a user."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                f"{MENTORING_SERVICE_URL}/api/v1/requests/connections",
+                headers={"X-User-Id": str(user_id)}
+            )
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    return []
+
+
+async def _fetch_admin_all_connections() -> list[dict]:
+    """Call Mentoring Service to get all active connections for admin view."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{MENTORING_SERVICE_URL}/api/v1/requests/admin/connections")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    return []
+
+
+async def resolve_connection(
     db: Session,
     *,
     user: User,
     context: str | None,
-) -> tuple[MentorshipConnection | None, bool | None]:
+) -> tuple[dict | None, bool | None]:
     """
-    Returns (connection, viewer_is_mentor).
-    viewer_is_mentor True means the current user is the mentor on the connection.
+    Returns (connection_dict, viewer_is_mentor).
+    Fetches connection data from Mentoring Service instead of local DB.
     """
-    mentor_profile = (
-        db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
-    )
-    mentee_profile = (
-        db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
-    )
+    conns = await _fetch_connections_from_service(user.id)
+    if not conns:
+        return None, None
+
+    # For dashboard simplicity, pick the first active one
+    conn = conns[0]
+    
+    # Check if the user is mentor or mentee based on their user_id
+    # The Mentoring Service returns mentor_id/mentee_id which are PROFILE IDs.
+    # We need to map them back to user_ids to know the context.
+    
+    mentor_profile = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+    mentee_profile = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
+    
     has_mentor = mentor_profile is not None
     has_mentee = mentee_profile is not None
-
-    if context not in (None, "mentor", "mentee"):
-        return None, None
 
     eff = _effective_context(
         context=context,
         has_mentor=has_mentor,
         has_mentee=has_mentee,
     )
-    if eff is None:
-        return None, None
+    
+    if eff == "mentor" and mentor_profile:
+        # Verify the connection matches this mentor profile
+        for c in conns:
+            if str(c["mentor_id"]) == str(mentor_profile.id):
+                return c, True
+    
+    if eff == "mentee" and mentee_profile:
+        # Verify the connection matches this mentee profile
+        for c in conns:
+            if str(c["mentee_id"]) == str(mentee_profile.id):
+                return c, False
 
-    if eff == "mentor":
-        if not mentor_profile:
-            return None, None
-        conn = (
-            db.query(MentorshipConnection)
-            .filter(
-                MentorshipConnection.mentor_id == mentor_profile.id,
-                MentorshipConnection.status == "ACTIVE",
-            )
-            .order_by(MentorshipConnection.id.asc())
-            .first()
-        )
-        if not conn:
-            return None, None
-        return conn, True
-
-    if not mentee_profile:
-        return None, None
-    conn = (
-        db.query(MentorshipConnection)
-        .filter(
-            MentorshipConnection.mentee_id == mentee_profile.id,
-            MentorshipConnection.status == "ACTIVE",
-        )
-        .order_by(MentorshipConnection.id.asc())
-        .first()
-    )
-    if not conn:
-        return None, None
-    return conn, False
+    return None, None
 
 
 def _session_price_for_row(
     db: Session,
     row: MentorshipSession,
-    sess_conn: MentorshipConnection,
+    sess_conn: dict,
 ) -> int:
     if row.price_charged is not None:
         return int(row.price_charged)
     mp = (
         db.query(MentorProfile)
-        .filter(MentorProfile.id == sess_conn.mentor_id)
+        .filter(MentorProfile.id == uuid.UUID(str(sess_conn["mentor_id"])))
         .one()
     )
     return resolve_mentor_session_price(db, mp)
@@ -120,10 +140,12 @@ def _session_price_for_row(
 
 def _mentor_mentee_brief(
     db: Session,
-    sess_conn: MentorshipConnection,
+    sess_conn: dict,
 ) -> tuple[dict, dict]:
-    mp = db.query(MentorProfile).filter(MentorProfile.id == sess_conn.mentor_id).one()
-    me = db.query(MenteeProfile).filter(MenteeProfile.id == sess_conn.mentee_id).one()
+    mentor_profile_id = uuid.UUID(str(sess_conn["mentor_id"]))
+    mentee_profile_id = uuid.UUID(str(sess_conn["mentee_id"]))
+    mp = db.query(MentorProfile).filter(MentorProfile.id == mentor_profile_id).one()
+    me = db.query(MenteeProfile).filter(MenteeProfile.id == mentee_profile_id).one()
     mentor_user = db.query(User).filter(User.id == mp.user_id).one()
     mentee_user = db.query(User).filter(User.id == me.user_id).one()
     mentor_brief = {
@@ -140,22 +162,25 @@ def _mentor_mentee_brief(
 
 def _partner_user_for_connection(
     db: Session,
-    conn: MentorshipConnection,
+    conn: dict,
     *,
     viewer_is_mentor: bool,
 ) -> User | None:
     if viewer_is_mentor:
+        mentee_profile_id = uuid.UUID(str(conn["mentee_id"]))
         mp = (
             db.query(MenteeProfile)
-            .filter(MenteeProfile.id == conn.mentee_id)
+            .filter(MenteeProfile.id == mentee_profile_id)
             .first()
         )
         if not mp:
             return None
         return db.query(User).filter(User.id == mp.user_id).first()
+    
+    mentor_profile_id = uuid.UUID(str(conn["mentor_id"]))
     mp = (
         db.query(MentorProfile)
-        .filter(MentorProfile.id == conn.mentor_id)
+        .filter(MentorProfile.id == mentor_profile_id)
         .first()
     )
     if not mp:
@@ -168,19 +193,24 @@ async def _active_connection_ids_for_viewer(
     *,
     user: User,
     viewer_is_mentor: bool,
-) -> tuple[list[UUID], MentorProfile | None]:
+) -> tuple[list[uuid.UUID], MentorProfile | None]:
+    conns = await _fetch_connections_from_service(user.id)
+    if not conns:
+        return [], None
+        
     if viewer_is_mentor:
         mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
         if not mp:
             return [], None
-        conns = db.query(MentorshipConnection).filter(MentorshipConnection.mentor_id == mp.id, MentorshipConnection.status == "ACTIVE").all()
-        return [c.id for c in conns], mp
+        # The service already filtered by user_id via header, but we filter by profile_id to be safe
+        ids = [uuid.UUID(str(c["id"])) for c in conns if str(c["mentor_id"]) == str(mp.id)]
+        return ids, mp
     else:
         mep = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
         if not mep:
             return [], None
-        conns = db.query(MentorshipConnection).filter(MentorshipConnection.mentee_id == mep.id, MentorshipConnection.status == "ACTIVE").all()
-        return [c.id for c in conns], None
+        ids = [uuid.UUID(str(c["id"])) for c in conns if str(c["mentee_id"]) == str(mep.id)]
+        return ids, None
 
 
 async def _collect_upcoming_payloads(
@@ -247,7 +277,10 @@ async def _collect_upcoming_payloads(
             break
         if kind == "session":
             row = payload
-            sess_conn = db.query(MentorshipConnection).filter(MentorshipConnection.id == row.connection_id).first()
+            # Connection data comes from Mentoring Service via the connection_id in the session
+            # We fetch all connections for the user and find the one matching the session
+            conns = await _fetch_connections_from_service(user.id)
+            sess_conn = next((c for c in conns if str(c["id"]) == str(row.connection_id)), None)
             if not sess_conn:
                 continue
                 
@@ -272,7 +305,8 @@ async def _collect_upcoming_payloads(
             )
         else:
             req, slot = payload
-            sess_conn = db.query(MentorshipConnection).filter(MentorshipConnection.id == req.connection_id).first()
+            conns = await _fetch_connections_from_service(user.id)
+            sess_conn = next((c for c in conns if str(c["id"]) == str(req.connection_id)), None)
             if not sess_conn:
                 continue
                 
@@ -380,14 +414,11 @@ async def get_dashboard_stats(
     user: User,
     context: str | None,
 ) -> dict:
-    conn, viewer_is_mentor = resolve_connection(db, user=user, context=context)
-    conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
-    
     # ADMIN GLOBAL VIEW
     if user.is_admin:
-        all_conns = db.query(MentorshipConnection).filter(MentorshipConnection.status == "ACTIVE").all()
-        unique_mentors = len(set(str(c.mentor_id) for c in all_conns))
-        unique_mentees = len(set(str(c.mentee_id) for c in all_conns))
+        all_conns = await _fetch_admin_all_connections()
+        unique_mentors = len(set(str(c["mentor_id"]) for c in all_conns))
+        unique_mentees = len(set(str(c["mentee_id"]) for c in all_conns))
         
         return {
             "active_partners": unique_mentors if context != "mentor" else unique_mentees,
@@ -396,6 +427,9 @@ async def get_dashboard_stats(
             "sessions_completed": 0,
             "active_sessions": len(all_conns),
         }
+
+    conn_dict, viewer_is_mentor = await resolve_connection(db, user=user, context=context)
+    conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
     
     if not conn_ids:
         return {
@@ -458,11 +492,11 @@ async def get_vault(
     if not conn:
         return []
     
-    # Join SessionHistory with MentorshipSession to filter by connection_id
+    # Mentoring Service handles connection_id mapping
     rows_db = (
         db.query(SessionHistory, MentorshipSession)
         .join(MentorshipSession, MentorshipSession.id == SessionHistory.session_id)
-        .filter(MentorshipSession.connection_id == conn.id)
+        .filter(MentorshipSession.connection_id == uuid.UUID(str(conn["id"])))
         .all()
     )
     

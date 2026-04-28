@@ -32,7 +32,7 @@ def enrich_recommendation_rows(
         m = by_uid.get(uid) if uid else None
         if not m:
             continue
-        r["mentor_profile_id"] = m.get("mentor_profile_id")
+        r["mentor_profile_id"] = m.get("user_id")
         r["display_name"] = m.get("display_name")
         r["expertise_areas"] = m.get("expertise_areas") or []
         r["tier_id"] = m.get("tier")

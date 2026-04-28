@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/recommendation_db"
+    database_url: str = "postgresql+asyncpg://postgres:123456@/user_db?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db"
     redis_url: str = "redis://localhost:6379/0"
     user_service_url: str = "http://localhost:8000"
     internal_api_token: str = "change-me-in-production"

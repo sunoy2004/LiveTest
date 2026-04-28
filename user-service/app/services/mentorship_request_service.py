@@ -33,6 +33,10 @@ def create_request(
 
     mentor = db.query(MentorProfile).filter(MentorProfile.id == mentor_profile_id).first()
     if mentor is None:
+        # Fallback: check if mentor_profile_id is actually a user_id
+        mentor = db.query(MentorProfile).filter(MentorProfile.user_id == mentor_profile_id).first()
+
+    if mentor is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Mentor profile not found")
     if not mentor.is_accepting_requests:
         raise HTTPException(

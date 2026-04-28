@@ -23,10 +23,15 @@ async def list_open_slots_for_connection(
     user: User,
     connection_id: UUID,
 ) -> list[TimeSlot]:
-    conn = db.query(MentorshipConnection).filter(MentorshipConnection.id == connection_id).first()
-    if not conn:
-         raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
-    mentor_id = conn.mentor_id
+    from app.services.mentoring_client import get_active_connections_from_mentoring_service
+    remotes = await get_active_connections_from_mentoring_service(user.id)
+    
+    # Verify connection remotely (Source of Truth)
+    conn_remote = next((r for r in remotes if UUID(str(r["id"])) == connection_id), None)
+    if not conn_remote:
+         raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found in Mentoring Service")
+         
+    mentor_id = UUID(str(conn_remote["mentor_id"]))
 
     return (
         db.query(TimeSlot)
@@ -37,18 +42,20 @@ async def list_open_slots_for_connection(
 
 
 async def mentee_booking_context(db: Session, *, user: User) -> dict | None:
+    from app.services.mentoring_client import get_active_connections_from_mentoring_service
+    remotes = await get_active_connections_from_mentoring_service(user.id)
+    if not remotes:
+        return None
+        
+    # Take first active connection
+    conn_remote = remotes[0]
+    conn_id = UUID(str(conn_remote["id"]))
+    mentor_id = UUID(str(conn_remote["mentor_id"]))
+    
     me = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
     if not me:
         return None
-    conn = (
-        db.query(MentorshipConnection)
-        .filter(MentorshipConnection.mentee_id == me.id, MentorshipConnection.status == "ACTIVE")
-        .first()
-    )
-    if not conn:
-        return None
-    conn_id = conn.id
-    mentor_id = conn.mentor_id
+        
     cached_credits = me.cached_credit_score
 
     mentor = db.query(MentorProfile).filter(MentorProfile.id == mentor_id).first()
@@ -59,6 +66,7 @@ async def mentee_booking_context(db: Session, *, user: User) -> dict | None:
         .filter(TimeSlot.mentor_id == mentor_id, TimeSlot.is_booked.is_(False), TimeSlot.pending_request_id.is_(None))
         .all()
     )
+
     
     session_price = resolve_mentor_session_price(db, mentor) if mentor else 0
     

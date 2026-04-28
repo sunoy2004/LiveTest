@@ -47,10 +47,29 @@ async def create_session_booking_request(
         .filter(MentorshipConnection.id == connection_id)
         .one_or_none()
     )
+    # --- CROSS-SERVICE BRIDGE: Auto-Sync ---
     if not conn:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
+        from app.services.mentoring_client import get_active_connections_from_mentoring_service
+        remotes = await get_active_connections_from_mentoring_service(user.id)
+        # Check if requested connection_id exists in remote active list
+        remote_match = next((r for r in remotes if UUID(str(r["id"])) == connection_id), None)
+        if not remote_match:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found locally or in Mentoring Service")
+        
+        # Create local shadow copy for FK consistency
+        conn = MentorshipConnection(
+            id=connection_id,
+            mentor_id=UUID(str(remote_match["mentor_id"])),
+            mentee_id=UUID(str(remote_match["mentee_id"])),
+            status="ACTIVE"
+        )
+        db.add(conn)
+        db.flush() # flush so it's available for queries below
+        log.info("Auto-synced connection %s from Mentoring Service", connection_id)
+
     if conn.status != "ACTIVE":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection is inactive")
+
     mentor_id = conn.mentor_id
     mentee_id = conn.mentee_id
 

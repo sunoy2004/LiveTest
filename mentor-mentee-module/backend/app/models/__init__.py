@@ -3,6 +3,8 @@ from app.models.enums import (
     GuardianConsentStatus,
     MentorshipConnectionStatus,
     MentorshipRequestStatus,
+    SessionStatus,
+    GoalStatus,
 )
 from app.models.mentee_profile import MenteeProfile
 from app.models.mentor_profile import MentorProfile
@@ -30,4 +32,6 @@ __all__ = [
     "Session",
     "Goal",
     "SessionHistory",
+    "SessionStatus",
+    "GoalStatus",
 ]

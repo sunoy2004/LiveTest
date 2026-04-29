@@ -73,7 +73,7 @@ class DashboardService:
         for sess, slot in completed_rows:
             duration = (slot.end_time - slot.start_time).total_seconds() / 3600.0
             hours_total += duration
-            if sess.start_time >= week_ago:
+            if slot.start_time >= week_ago:
                 hours_week += duration
 
         active_ct = await self._session.scalar(

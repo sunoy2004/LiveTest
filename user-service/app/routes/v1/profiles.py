@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import User
-from app.schemas import MentoringProfileMeResponse
+from app.schemas import FullProfileResponse, MentoringProfileMeResponse
 from app.services.profile_service import get_full_profile
 
 router = APIRouter()

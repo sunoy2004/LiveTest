@@ -13,6 +13,7 @@ import MatchCard from "@/components/dashboard/MatchCard";
 import AiMatchCard from "@/components/dashboard/AiMatchCard";
 import ScheduleSessionDialog from "@/components/dashboard/ScheduleSessionDialog";
 import BookingDialog from "@/components/dashboard/BookingDialog";
+import ManageAvailabilityDialog from "@/components/dashboard/ManageAvailabilityDialog";
 import IncomingSessionRequestsPanel from "@/components/dashboard/IncomingSessionRequestsPanel";
 import IncomingMatchmakerRequestsPanel from "@/components/dashboard/IncomingMatchmakerRequestsPanel";
 import CreditWalletWidget from "@/components/dashboard/CreditWalletWidget";
@@ -125,6 +126,7 @@ const Index = () => {
 
   const greetingName = user?.email?.split("@")[0] ?? "there";
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [manageAvailabilityOpen, setManageAvailabilityOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchProfile | null>(null);
 
@@ -410,11 +412,14 @@ const Index = () => {
             <Button
               size="sm"
               className="text-xs gradient-primary border-0 shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/25 transition-shadow"
-              onClick={() => setScheduleOpen(true)}
+              onClick={() => {
+                if (role === "mentor") setManageAvailabilityOpen(true);
+                else setScheduleOpen(true);
+              }}
               disabled={guardianLocksMentorRequests}
             >
               <Plus className="h-3.5 w-3.5 mr-1" />{" "}
-              {role === "mentee" ? "Request" : "Schedule"}
+              {role === "mentee" ? "Request" : "Update availability"}
             </Button>
           }
         >
@@ -432,6 +437,11 @@ const Index = () => {
           role={role}
           token={token}
           cachedCreditScore={role === "mentee" ? credits : undefined}
+        />
+        <ManageAvailabilityDialog
+          open={manageAvailabilityOpen}
+          onOpenChange={setManageAvailabilityOpen}
+          token={token}
         />
 
         {/* Matchmaker carousel — Workflow 2: AI API GET /recommendations (not Mentoring API) */}

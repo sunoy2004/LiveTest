@@ -27,6 +27,17 @@ function isLikelyMisconfiguredLocalMentoringUrl(base: string): boolean {
   }
 }
 
+function isBareSameOriginAsPage(normalized: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const u = new URL(normalized);
+    const w = new URL(window.location.href);
+    return u.origin === w.origin && (u.pathname === "" || u.pathname === "/");
+  } catch {
+    return false;
+  }
+}
+
 function mentoringProxyBase(): string {
   if (typeof window === "undefined") return "";
   return `${window.location.origin}${USER_SERVICE_PROXY_PATH}`.replace(/\/$/, "");
@@ -36,11 +47,11 @@ function mentoringProxyBase(): string {
 export function getMentoringApiBaseUrl(): string {
   // Production: use the User Service URL because scheduling, dashboard, and
   // session routes live on the User Service (not the Mentoring Service).
-  // The nginx static server has no backend proxy, so we must hit the backend directly.
+  // The nginx static server now has a /user-service/ proxy to handle this.
   const userServiceUrl = (import.meta.env.VITE_USER_SERVICE_URL as string | undefined)?.trim();
   if (userServiceUrl) {
     const normalized = userServiceUrl.replace(/\/$/, "");
-    if (!isLikelyMisconfiguredLocalMentoringUrl(normalized)) {
+    if (!isLikelyMisconfiguredLocalMentoringUrl(normalized) && !isBareSameOriginAsPage(normalized)) {
       return normalized;
     }
   }
@@ -50,14 +61,15 @@ export function getMentoringApiBaseUrl(): string {
   const mentoringUrl = (import.meta.env.VITE_MENTORING_API_BASE_URL as string | undefined)?.trim();
   if (mentoringUrl) {
     const normalized = mentoringUrl.replace(/\/$/, "");
-    if (!isLikelyMisconfiguredLocalMentoringUrl(normalized)) {
+    if (!isLikelyMisconfiguredLocalMentoringUrl(normalized) && !isBareSameOriginAsPage(normalized)) {
       return normalized;
     }
   }
 
-  // Local dev: use same-origin proxy (Vite proxies /user-service → localhost:8000)
+  // Local dev & Prod fallback: use same-origin proxy (Vite or Nginx proxies /user-service → Backend)
   return mentoringProxyBase();
 }
+
 
 
 /** AI Matching / Graph service — Workflow 2: GET /recommendations (not routed through Mentoring API). */

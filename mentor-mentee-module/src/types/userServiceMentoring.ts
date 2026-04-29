@@ -14,7 +14,10 @@ export type AvailableSlotItem = {
   end_time: string;
   /** Coins charged when booking this slot (from User Service time_slots.cost_credits). */
   cost_credits: number;
+  is_booked?: boolean;
+  pending_request_id?: string | null;
 };
+
 
 export type BookSessionSimpleResponse = {
   request_id: string;

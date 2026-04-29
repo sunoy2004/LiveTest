@@ -118,3 +118,44 @@ export async function rejectSessionRequest(token: string, requestId: string): Pr
   }
 }
 
+
+export async function fetchMyAvailability(token: string): Promise<AvailableSlotItem[]> {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/my-availability`, {
+    headers: headers(token),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `my availability failed (${res.status})`);
+  }
+  return res.json() as Promise<AvailableSlotItem[]>;
+}
+
+
+export async function addAvailability(
+  token: string,
+  body: { start_time: string; end_time: string },
+): Promise<{ slot_id: string; status: string }> {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/availability`, {
+    method: "POST",
+    headers: headers(token),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `add availability failed (${res.status})`);
+  }
+  return res.json() as Promise<{ slot_id: string; status: string }>;
+}
+
+
+export async function deleteAvailability(token: string, slotId: string): Promise<void> {
+  const res = await fetch(
+    `${getUserServiceBase()}/api/v1/scheduling/availability/${encodeURIComponent(slotId)}`,
+    { method: "DELETE", headers: headers(token) },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `delete availability failed (${res.status})`);
+  }
+}
+

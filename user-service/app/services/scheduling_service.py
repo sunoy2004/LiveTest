@@ -150,3 +150,72 @@ async def book_session_simple(
         slot_id=slot_id,
         agreed_cost=None,
     )
+
+
+async def get_my_availability(db: Session, *, user: User) -> list[dict]:
+    mentor = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+    if not mentor:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentor profile not found")
+
+    rows = (
+        db.query(TimeSlot)
+        .filter(TimeSlot.mentor_id == mentor.id)
+        .order_by(TimeSlot.start_time.asc())
+        .all()
+    )
+    return [
+        {
+            "slot_id": r.id,
+            "start_time": r.start_time,
+            "end_time": r.end_time,
+            "is_booked": r.is_booked,
+            "pending_request_id": r.pending_request_id,
+        }
+        for r in rows
+    ]
+
+
+async def add_availability(
+    db: Session,
+    *,
+    user: User,
+    start_time: datetime,
+    end_time: datetime,
+) -> dict:
+    mentor = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+    if not mentor:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentor profile not found")
+
+    slot = TimeSlot(
+        mentor_id=mentor.id,
+        start_time=start_time,
+        end_time=end_time,
+        is_booked=False,
+    )
+    db.add(slot)
+    db.commit()
+    db.refresh(slot)
+    return {"slot_id": slot.id, "status": "created"}
+
+
+async def delete_availability(db: Session, *, user: User, slot_id: UUID) -> dict:
+    mentor = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+    if not mentor:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentor profile not found")
+
+    slot = (
+        db.query(TimeSlot)
+        .filter(TimeSlot.id == slot_id, TimeSlot.mentor_id == mentor.id)
+        .first()
+    )
+    if not slot:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Slot not found")
+
+    if slot.is_booked or slot.pending_request_id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Cannot delete a booked or pending slot"
+        )
+
+    db.delete(slot)
+    db.commit()
+    return {"status": "deleted"}

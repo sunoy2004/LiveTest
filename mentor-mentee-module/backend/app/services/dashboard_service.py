@@ -17,15 +17,17 @@ class DashboardService:
         self._session = session
 
     async def get_stats(self, user_id: uuid.UUID) -> dict:
-        # Identify profile IDs
-        mentee_id = await self._session.scalar(
-            select(MenteeProfile.id).where(MenteeProfile.user_id == user_id)
+        # Check if user has ANY mentorship participation (mentee or mentor)
+        # This is a lightweight check to avoid 0-stat displays for non-participants.
+        participant = await self._session.scalar(
+            select(MentorshipConnection.id).where(
+                or_(
+                    MentorshipConnection.mentee_id == user_id,
+                    MentorshipConnection.mentor_id == user_id
+                )
+            ).limit(1)
         )
-        mentor_id = await self._session.scalar(
-            select(MentorProfile.id).where(MentorProfile.user_id == user_id)
-        )
-
-        if not mentee_id and not mentor_id:
+        if not participant:
             return {
                 "active_partners": 0,
                 "hours_total": 0.0,
@@ -89,10 +91,6 @@ class DashboardService:
         }
 
     async def get_upcoming_sessions(self, user_id: uuid.UUID, limit: int = 5) -> list[dict]:
-        mentee_id = await self._session.scalar(
-            select(MenteeProfile.id).where(MenteeProfile.user_id == user_id)
-        )
-        mentor_id = await self._session.scalar(
         conn_ids_stmt = select(MentorshipConnection.id).where(
             MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE,
             or_(
@@ -132,8 +130,6 @@ class DashboardService:
 
     async def get_goals(self, user_id: uuid.UUID) -> list[dict]:
         from app.models import Goal
-        mentee_id = await self._session.scalar(select(MenteeProfile.id).where(MenteeProfile.user_id == user_id))
-        mentor_id = await self._session.scalar(select(MentorProfile.id).where(MentorProfile.user_id == user_id))
         
         stmt = select(Goal).join(MentorshipConnection).where(
             MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE,
@@ -147,8 +143,6 @@ class DashboardService:
 
     async def get_vault(self, user_id: uuid.UUID) -> list[dict]:
         from app.models import SessionHistory
-        mentee_id = await self._session.scalar(select(MenteeProfile.id).where(MenteeProfile.user_id == user_id))
-        mentor_id = await self._session.scalar(select(MentorProfile.id).where(MentorProfile.user_id == user_id))
         
         stmt = (
             select(MentorshipSession, SessionHistory, TimeSlot)

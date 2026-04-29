@@ -39,12 +39,14 @@ async def require_user_id(
             user_id=uid,
             email=payload["email"],
             role=payload["role"],
+            is_admin=payload.get("is_admin", False),
             password_hash="[REDACTED]" # Not needed in replica but schema requires it
         ).on_conflict_do_update(
             index_elements=[User.user_id],
             set_={
                 "email": payload["email"],
-                "role": payload["role"]
+                "role": payload["role"],
+                "is_admin": payload.get("is_admin", False)
             }
         )
         await db.execute(stmt)
@@ -54,7 +56,7 @@ async def require_user_id(
     except (ValueError, KeyError) as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            detail=f"Not authenticated: {str(e)}",
         )
 
 

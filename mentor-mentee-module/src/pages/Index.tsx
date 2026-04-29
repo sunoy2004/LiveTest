@@ -60,27 +60,21 @@ const Index = () => {
   const navigate = useNavigate();
   useDashboardWebSocket(token);
 
-  const { data: fullProfile } = useQuery({
-    queryKey: ["user-service", "profile-full", token],
-    queryFn: () => fetchProfileFull(token!),
-    enabled: Boolean(token),
-    staleTime: 60_000,
-  });
 
   useEffect(() => {
-    if (!token || !fullProfile?.is_admin) return;
+    if (!token || !profile?.is_admin) return;
     navigate("admin/mentors", { replace: true });
-  }, [token, fullProfile?.is_admin, navigate]);
+  }, [token, profile?.is_admin, navigate]);
 
   const { defaultRole, showRoleToggle } = useMemo(() => {
-    if (fullProfile) {
+    if (profile) {
       return getRoleUiModeFromProfiles(
-        fullProfile.mentor_profile,
-        fullProfile.mentee_profile,
+        profile.mentor_profile,
+        profile.mentee_profile,
       );
     }
     return getRoleUiModeWhileProfileLoading();
-  }, [fullProfile]);
+  }, [profile]);
 
   const [role, setRole] = useState<"mentor" | "mentee">(defaultRole);
 
@@ -142,8 +136,8 @@ const Index = () => {
     isError: aiRecsError,
   } = useAiRecommendations();
 
-  const mentee = profile.mentee;
-  const usMentee = fullProfile?.mentee_profile;
+  const mentee = profile.mentee_profile;
+  const usMentee = profile.mentee_profile;
   const fallbackCredits =
     usMentee != null ? usMentee.cached_credit_score : (mentee?.cached_credit_score ?? 100);
 

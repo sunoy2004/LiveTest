@@ -28,7 +28,8 @@ export interface SearchResultItem {
 
 /** GET /api/v1/profiles/me — composite view for the SPA (shapes follow backend contracts). */
 export interface MentoringProfileMeResponse {
-  mentee?: {
+  is_admin: boolean;
+  mentee_profile?: {
     user_id: string;
     learning_goals: string[];
     education_level: string;
@@ -36,13 +37,16 @@ export interface MentoringProfileMeResponse {
     guardian_consent_status: GuardianConsentStatus;
     cached_credit_score: number;
   };
-  mentor?: {
+  mentor_profile?: {
     user_id: string;
     tier_id: MentorTierId;
     is_accepting_requests: boolean;
     expertise_areas: string[];
     total_hours_mentored: number;
   };
+  /** Legacy aliases if still used */
+  mentee?: MentoringProfileMeResponse["mentee_profile"];
+  mentor?: MentoringProfileMeResponse["mentor_profile"];
 }
 
 export interface PostMenteeProfileBody {

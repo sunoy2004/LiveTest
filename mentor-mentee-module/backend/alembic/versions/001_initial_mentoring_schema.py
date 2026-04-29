@@ -43,6 +43,7 @@ def upgrade() -> None:
             sa.Column("email", sa.Text(), nullable=False),
             sa.Column("password_hash", sa.Text(), nullable=False),
             sa.Column("role", sa.String(length=32), nullable=False),
+            sa.Column("is_admin", sa.Boolean(), server_default="false", nullable=False),
             sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
             sa.PrimaryKeyConstraint("user_id", name=op.f("pk_users")),
             sa.UniqueConstraint("email", name=op.f("uq_users_email")),

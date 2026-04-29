@@ -74,7 +74,7 @@ export function getUserServiceDashboardWsUrl(token: string): string {
 }
 
 export async function fetchProfileFull(token: string): Promise<FullProfileResponse> {
-  const res = await fetch(`${getUserServiceBase()}/profile/full`, {
+  const res = await fetch(`${getUserServiceBase()}/api/v1/profiles/full`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",

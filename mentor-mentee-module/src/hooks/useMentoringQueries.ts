@@ -97,7 +97,11 @@ export function resolveProfile(
 ): MentoringProfileMeResponse {
   if (!data) return fallback;
   return {
-    mentee: data.mentee ?? fallback.mentee,
-    mentor: data.mentor ?? fallback.mentor,
+    is_admin: data.is_admin,
+    mentee_profile: data.mentee_profile ?? fallback.mentee_profile,
+    mentor_profile: data.mentor_profile ?? fallback.mentor_profile,
+    // Support legacy keys if components still use them
+    mentee: data.mentee_profile ?? fallback.mentee_profile,
+    mentor: data.mentor_profile ?? fallback.mentor_profile,
   };
 }

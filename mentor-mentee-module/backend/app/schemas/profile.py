@@ -41,5 +41,8 @@ class MentorProfileRead(BaseModel):
 
 
 class ProfileMeResponse(BaseModel):
-    mentee: MenteeProfileRead | None = None
-    mentor: MentorProfileRead | None = None
+    mentee_profile: MenteeProfileRead | None = Field(default=None, alias="mentee")
+    mentor_profile: MentorProfileRead | None = Field(default=None, alias="mentor")
+    is_admin: bool = False
+    
+    model_config = ConfigDict(populate_by_name=True)

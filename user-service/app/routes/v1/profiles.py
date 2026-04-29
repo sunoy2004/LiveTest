@@ -24,6 +24,21 @@ def profiles_me(
     )
 
 
+@router.get("/full", response_model=FullProfileResponse)
+def get_profiles_full(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> FullProfileResponse:
+    full = get_full_profile(db, user=user)
+    return FullProfileResponse(
+        user_id=user.id,
+        email=user.email,
+        is_admin=user.is_admin,
+        mentee_profile=full.mentee_profile,
+        mentor_profile=full.mentor_profile,
+    )
+
+
 @router.post("/mentee")
 def post_mentee_profile(
     body: dict,

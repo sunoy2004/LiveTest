@@ -44,7 +44,9 @@ async def get_my_profiles(
     svc: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> ProfileMeResponse:
     mentee, mentor = await svc.get_profile_bundle(user_id)
+    user = await svc._session.get(User, user_id)
     return ProfileMeResponse(
-        mentee=MenteeProfileRead.model_validate(mentee) if mentee else None,
-        mentor=MentorProfileRead.model_validate(mentor) if mentor else None,
+        mentee_profile=mentee,
+        mentor_profile=mentor,
+        is_admin=user.is_admin if user else False
     )

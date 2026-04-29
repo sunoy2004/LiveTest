@@ -18,16 +18,22 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
-allowed_origins = [o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()]
+_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173,"
+    "https://common-ui-1095720168864-1095720168864.us-central1.run.app,"
+    "https://mentee-ui-1095720168864-1095720168864.us-central1.run.app,"
+    "https://gamification-service-1095720168864-1095720168864.us-central1.run.app"
+)
+_origins_list = [o.strip() for o in _origins.split(",") if o.strip()]
 
-# Enable all origins for local testing
 if os.getenv("ALLOW_ALL_CORS", "true").lower() == "true":
-    allowed_origins = ["*"]
+    _origins_list = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins or [],
-    allow_credentials=(allowed_origins != ["*"]),
+    allow_origins=_origins_list,
+    allow_credentials=(_origins_list != ["*"]),
     allow_methods=["*"],
     allow_headers=["*"],
 )

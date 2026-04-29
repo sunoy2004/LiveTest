@@ -59,6 +59,12 @@ const Index = () => {
   const { user, token } = useMentorShellAuth();
   const navigate = useNavigate();
   useDashboardWebSocket(token);
+  
+  const { data: profileRemote, isFetching: profileLoading } = useMentoringProfileMe();
+  const profile = useMemo(
+    () => resolveProfile(profileRemote, getDevProfileFallback()),
+    [profileRemote],
+  );
 
 
   useEffect(() => {
@@ -124,11 +130,6 @@ const Index = () => {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchProfile | null>(null);
 
-  const { data: profileRemote, isFetching: profileLoading } = useMentoringProfileMe();
-  const profile = useMemo(
-    () => resolveProfile(profileRemote, getDevProfileFallback()),
-    [profileRemote],
-  );
   const {
     data: aiRecs,
     refetch: refetchAi,

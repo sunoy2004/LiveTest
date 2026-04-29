@@ -17,7 +17,8 @@ export type SearchRole = "mentor" | "mentee" | "all";
 export interface SearchResultItem {
   user_id: string;
   mentor_profile_id?: string | null;
-  full_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   role: Exclude<SearchRole, "all">;
   expertise: string[];
   tier?: MentorTierId | null;
@@ -31,6 +32,8 @@ export interface MentoringProfileMeResponse {
   is_admin: boolean;
   mentee_profile?: {
     user_id: string;
+    first_name?: string | null;
+    last_name?: string | null;
     learning_goals: string[];
     education_level: string;
     is_minor: boolean;
@@ -39,6 +42,8 @@ export interface MentoringProfileMeResponse {
   };
   mentor_profile?: {
     user_id: string;
+    first_name?: string | null;
+    last_name?: string | null;
     tier_id: MentorTierId;
     is_accepting_requests: boolean;
     expertise_areas: string[];

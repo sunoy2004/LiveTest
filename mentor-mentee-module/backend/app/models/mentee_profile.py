@@ -26,11 +26,8 @@ class MenteeProfile(Base):
         index=True,
     )
     user_id = synonym("id")
-    full_name: Mapped[str | None] = mapped_column(
-        String(255),
-        nullable=True,
-        index=True,
-    )
+    first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     learning_goals: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False)
     education_level: Mapped[str] = mapped_column(String(64), nullable=False)
     is_minor: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

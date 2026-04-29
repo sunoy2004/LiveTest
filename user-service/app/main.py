@@ -4,17 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db import Base, engine
-from app.db_patches import apply_schema_patches
 from app.routes import router
-from app.seed import seed_if_empty
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    apply_schema_patches()
-    seed_if_empty()
     from app.realtime.redis_listener import start_listener, stop_listener
 
     await start_listener()

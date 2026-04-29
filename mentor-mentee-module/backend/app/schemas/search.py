@@ -12,7 +12,8 @@ class SearchRole(str, Enum):
 
 class SearchResult(BaseModel):
     user_id: uuid.UUID
-    full_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
     role: SearchRole
     expertise: list[str] = Field(default_factory=list)
     tier: str | None = None

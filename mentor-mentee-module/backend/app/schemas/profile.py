@@ -6,12 +6,16 @@ from app.models.enums import GuardianConsentStatus
 
 
 class MenteeProfileCreate(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
     learning_goals: list[str] = Field(default_factory=list)
     education_level: str = Field(..., min_length=1, max_length=64)
     is_minor: bool = False
 
 
 class MentorProfileCreate(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
     tier_id: str = Field(..., min_length=1, max_length=32)
     expertise_areas: list[str] = Field(default_factory=list)
     is_accepting_requests: bool = True
@@ -22,6 +26,8 @@ class MenteeProfileRead(BaseModel):
 
     id: uuid.UUID
     user_id: uuid.UUID
+    first_name: str | None = None
+    last_name: str | None = None
     learning_goals: list[str]
     education_level: str
     is_minor: bool
@@ -34,6 +40,8 @@ class MentorProfileRead(BaseModel):
 
     id: uuid.UUID
     user_id: uuid.UUID
+    first_name: str | None = None
+    last_name: str | None = None
     tier_id: str
     is_accepting_requests: bool
     expertise_areas: list[str]

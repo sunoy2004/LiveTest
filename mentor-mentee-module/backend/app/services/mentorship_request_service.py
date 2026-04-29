@@ -99,7 +99,7 @@ class MentorshipRequestService:
             return []
         
         stmt = (
-            select(MentorshipRequest, MenteeProfile.full_name)
+            select(MentorshipRequest, MenteeProfile.first_name, MenteeProfile.last_name)
             .join(MenteeProfile, MentorshipRequest.mentee_id == MenteeProfile.id)
             .where(
                 MentorshipRequest.mentor_id == mentor.id,
@@ -108,14 +108,14 @@ class MentorshipRequestService:
         )
         results = (await self._session.execute(stmt)).all()
         out = []
-        for req, name in results:
+        for req, fn, ln in results:
             d = {
                 "id": req.id,
                 "mentee_id": req.mentee_id,
                 "mentor_id": req.mentor_id,
                 "status": req.status,
                 "intro_message": req.intro_message,
-                "mentee_name": name,
+                "mentee_name": f"{fn or ''} {ln or ''}".strip() or "Mentee",
             }
             out.append(d)
         return out
@@ -128,20 +128,20 @@ class MentorshipRequestService:
             return []
             
         stmt = (
-            select(MentorshipRequest, MentorProfile.full_name)
+            select(MentorshipRequest, MentorProfile.first_name, MentorProfile.last_name)
             .join(MentorProfile, MentorshipRequest.mentor_id == MentorProfile.id)
             .where(MentorshipRequest.mentee_id == mentee.id)
         )
         results = (await self._session.execute(stmt)).all()
         out = []
-        for req, name in results:
+        for req, fn, ln in results:
             d = {
                 "id": req.id,
                 "mentee_id": req.mentee_id,
                 "mentor_id": req.mentor_id,
                 "status": req.status,
                 "intro_message": req.intro_message,
-                "mentor_name": name,
+                "mentor_name": f"{fn or ''} {ln or ''}".strip() or "Mentor",
             }
             out.append(d)
         return out
@@ -209,8 +209,10 @@ class MentorshipRequestService:
         stmt = (
             select(
                 MentorshipConnection, 
-                MentorProfile.full_name.label("m_name"), 
-                MenteeProfile.full_name.label("me_name"),
+                MentorProfile.first_name.label("m_fn"), 
+                MentorProfile.last_name.label("m_ln"),
+                MenteeProfile.first_name.label("me_fn"),
+                MenteeProfile.last_name.label("me_ln"),
                 MentorProfile.user_id.label("m_uid"),
                 MenteeProfile.user_id.label("me_uid"),
                 MentorUser.email.label("m_email"),
@@ -240,8 +242,8 @@ class MentorshipRequestService:
                 "mentor_email": row.m_email,
                 "status": "ACCEPTED",
                 "intro_message": "Active Connection",
-                "mentee_name": row.me_name,
-                "mentor_name": row.m_name,
+                "mentee_name": f"{row.me_fn or ''} {row.me_ln or ''}".strip() or "Mentee",
+                "mentor_name": f"{row.m_fn or ''} {row.m_ln or ''}".strip() or "Mentor",
             }
             out.append(d)
         return out
@@ -348,6 +350,6 @@ class MentorshipRequestService:
             "mentor_id": req.mentor_id,
             "status": req.status,
             "intro_message": req.intro_message,
-            "mentee_name": mentee.full_name,
-            "mentor_name": mentor.full_name,
+            "mentee_name": f"{mentee.first_name or ''} {mentee.last_name or ''}".strip() or "Mentee",
+            "mentor_name": f"{mentor.first_name or ''} {mentor.last_name or ''}".strip() or "Mentor",
         }

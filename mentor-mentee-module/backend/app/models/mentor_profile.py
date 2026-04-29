@@ -25,11 +25,8 @@ class MentorProfile(Base):
         index=True,
     )
     user_id = synonym("id")
-    full_name: Mapped[str | None] = mapped_column(
-        String(255),
-        nullable=True,
-        index=True,
-    )
+    first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     tier_id: Mapped[str] = mapped_column(
         String(32),
         ForeignKey("mentor_tiers.tier_id", ondelete="RESTRICT"),

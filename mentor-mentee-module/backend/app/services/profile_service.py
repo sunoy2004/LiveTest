@@ -29,6 +29,8 @@ class ProfileService:
         )
         profile = MenteeProfile(
             user_id=user_id,
+            first_name=data.first_name,
+            last_name=data.last_name,
             learning_goals=list(data.learning_goals),
             education_level=data.education_level,
             is_minor=data.is_minor,
@@ -66,6 +68,8 @@ class ProfileService:
 
         profile = MentorProfile(
             user_id=user_id,
+            first_name=data.first_name,
+            last_name=data.last_name,
             tier_id=data.tier_id,
             is_accepting_requests=data.is_accepting_requests,
             expertise_areas=list(data.expertise_areas),

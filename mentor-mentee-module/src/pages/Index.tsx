@@ -124,7 +124,8 @@ const Index = () => {
   const dashboardGoals = useMemo(() => mapGoals(goalsRes ?? []), [goalsRes]);
   const pastSessions = useMemo(() => mapVaultSessions(vaultRes ?? []), [vaultRes]);
 
-  const greetingName = user?.email?.split("@")[0] ?? "there";
+  const profileData = role === "mentor" ? profile.mentor_profile : profile.mentee_profile;
+  const greetingName = profileData?.first_name || user?.email?.split("@")[0] || "there";
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [manageAvailabilityOpen, setManageAvailabilityOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);

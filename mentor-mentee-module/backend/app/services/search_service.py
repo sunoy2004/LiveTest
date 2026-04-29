@@ -45,11 +45,6 @@ class SearchService:
         except ValueError:
             return None
 
-    def _get_display_name(self, full_name: str | None, email: str) -> str:
-        if full_name:
-            return full_name
-        local = email.split("@")[0]
-        return local.replace(".", " ").replace("_", " ").title()
 
     async def _search_mentors(
         self,
@@ -64,7 +59,10 @@ class SearchService:
         if user_id is not None:
             stmt = stmt.where(MentorProfile.user_id == user_id)
         else:
-            name_match = MentorProfile.full_name.ilike(f"%{query}%")
+            name_match = or_(
+                MentorProfile.first_name.ilike(f"%{query}%"),
+                MentorProfile.last_name.ilike(f"%{query}%")
+            )
             expertise_match = MentorProfile.expertise_areas.contains([query])
             email_match = User.email.ilike(f"%{query}%")
             stmt = stmt.where(or_(name_match, expertise_match, email_match))
@@ -73,7 +71,8 @@ class SearchService:
         return [
             SearchResult(
                 user_id=m.user_id,
-                full_name=self._get_display_name(m.full_name, email),
+                first_name=m.first_name or email.split("@")[0].title(),
+                last_name=m.last_name,
                 role=SearchRole.mentor,
                 expertise=list(m.expertise_areas or []),
                 tier=m.tier_id,
@@ -94,7 +93,10 @@ class SearchService:
         if user_id is not None:
             stmt = stmt.where(MenteeProfile.user_id == user_id)
         else:
-            name_match = MenteeProfile.full_name.ilike(f"%{query}%")
+            name_match = or_(
+                MenteeProfile.first_name.ilike(f"%{query}%"),
+                MenteeProfile.last_name.ilike(f"%{query}%")
+            )
             goals_match = MenteeProfile.learning_goals.contains([query])
             email_match = User.email.ilike(f"%{query}%")
             stmt = stmt.where(or_(name_match, goals_match, email_match))
@@ -103,7 +105,8 @@ class SearchService:
         return [
             SearchResult(
                 user_id=m.user_id,
-                full_name=self._get_display_name(m.full_name, email),
+                first_name=m.first_name or email.split("@")[0].title(),
+                last_name=m.last_name,
                 role=SearchRole.mentee,
                 expertise=list(m.learning_goals or []),
                 tier=None,

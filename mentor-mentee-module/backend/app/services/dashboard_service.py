@@ -91,26 +91,32 @@ class DashboardService:
         }
 
     async def get_upcoming_sessions(self, user_id: uuid.UUID, limit: int = 5) -> list[dict]:
-        conn_ids_stmt = select(MentorshipConnection.id).where(
-            MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE,
-            or_(
-                MentorshipConnection.mentee_id == user_id,
-                MentorshipConnection.mentor_id == user_id
-            )
-        )
-        conn_ids = (await self._session.execute(conn_ids_stmt)).scalars().all()
+        from sqlalchemy.orm import aliased
+        MenteeP = aliased(MenteeProfile)
+        MentorP = aliased(MentorProfile)
 
-        if not conn_ids:
-            return []
-
-        now = datetime.now(timezone.utc)
         stmt = (
-            select(MentorshipSession, TimeSlot)
+            select(
+                MentorshipSession, 
+                TimeSlot,
+                MentorshipConnection,
+                MenteeP.first_name.label("mentee_fn"),
+                MenteeP.last_name.label("mentee_ln"),
+                MentorP.first_name.label("mentor_fn"),
+                MentorP.last_name.label("mentor_ln")
+            )
             .join(TimeSlot, MentorshipSession.slot_id == TimeSlot.id)
+            .join(MentorshipConnection, MentorshipSession.connection_id == MentorshipConnection.id)
+            .outerjoin(MenteeP, MentorshipConnection.mentee_id == MenteeP.user_id)
+            .outerjoin(MentorP, MentorshipConnection.mentor_id == MentorP.user_id)
             .where(
-                MentorshipSession.connection_id.in_(conn_ids),
+                MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE,
+                or_(
+                    MentorshipConnection.mentee_id == user_id,
+                    MentorshipConnection.mentor_id == user_id
+                ),
                 MentorshipSession.status == SessionStatus.SCHEDULED,
-                TimeSlot.start_time > now
+                TimeSlot.start_time > datetime.now(timezone.utc)
             )
             .order_by(TimeSlot.start_time.asc())
             .limit(limit)
@@ -119,12 +125,19 @@ class DashboardService:
         rows = (await self._session.execute(stmt)).all()
         
         out = []
-        for s, slot in rows:
+        for s, slot, conn, me_fn, me_ln, mo_fn, mo_ln in rows:
+            # Determine partner name
+            if conn.mentee_id == user_id:
+                partner_name = f"{mo_fn or ''} {mo_ln or ''}".strip() or "Mentor"
+            else:
+                partner_name = f"{me_fn or ''} {me_ln or ''}".strip() or "Mentee"
+
             out.append({
                 "session_id": str(s.id),
                 "start_time": slot.start_time,
                 "status": s.status,
-                "connection_id": str(s.connection_id)
+                "connection_id": str(s.connection_id),
+                "partner_name": partner_name
             })
         return out
 
@@ -143,12 +156,26 @@ class DashboardService:
 
     async def get_vault(self, user_id: uuid.UUID) -> list[dict]:
         from app.models import SessionHistory
+        from sqlalchemy.orm import aliased
+        MenteeP = aliased(MenteeProfile)
+        MentorP = aliased(MentorProfile)
         
         stmt = (
-            select(MentorshipSession, SessionHistory, TimeSlot)
+            select(
+                MentorshipSession, 
+                SessionHistory, 
+                TimeSlot,
+                MentorshipConnection,
+                MenteeP.first_name.label("mentee_fn"),
+                MenteeP.last_name.label("mentee_ln"),
+                MentorP.first_name.label("mentor_fn"),
+                MentorP.last_name.label("mentor_ln")
+            )
             .join(MentorshipConnection, MentorshipSession.connection_id == MentorshipConnection.id)
             .join(SessionHistory, SessionHistory.session_id == MentorshipSession.id)
             .join(TimeSlot, MentorshipSession.slot_id == TimeSlot.id)
+            .outerjoin(MenteeP, MentorshipConnection.mentee_id == MenteeP.user_id)
+            .outerjoin(MentorP, MentorshipConnection.mentor_id == MentorP.user_id)
             .where(
                 or_(
                     MentorshipConnection.mentee_id == user_id,
@@ -164,4 +191,5 @@ class DashboardService:
             "notes": hist.notes_data or {},
             "mentor_rating": hist.mentor_rating,
             "mentee_rating": hist.mentee_rating,
-        } for sess, hist, slot in results]
+            "partner_name": (f"{mo_fn or ''} {mo_ln or ''}".strip() or "Mentor") if conn.mentee_id == user_id else (f"{me_fn or ''} {me_ln or ''}".strip() or "Mentee")
+        } for sess, hist, slot, conn, me_fn, me_ln, mo_fn, mo_ln in results]

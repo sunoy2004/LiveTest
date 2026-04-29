@@ -58,10 +58,16 @@ export async function mentoringFetch(
   init?: RequestInit,
 ): Promise<Response> {
   const base = getMentoringApiBaseUrl();
-  if (!base) {
+  if (!base && !path.startsWith("http")) {
     throw new MentoringApiError("VITE_MENTORING_API_BASE_URL is not set", 0);
   }
-  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  
+  // If the path is already a full URL (starts with http), use it as is.
+  // Otherwise, prepend the base.
+  const url = path.startsWith("http") 
+    ? path 
+    : `${base}${path.startsWith("/") ? path : `/${path}`}`;
+    
   const headers = mentoringHeaders(init?.headers);
   return fetch(url, { ...init, headers });
 }
@@ -93,10 +99,14 @@ export async function mentoringJson<T>(
 /** Workflow 2 — direct call to AI Matching service (separate host from Mentoring API). */
 export async function aiFetch(path: string, init?: RequestInit): Promise<Response> {
   const base = getAiApiBaseUrl();
-  if (!base) {
+  if (!base && !path.startsWith("http")) {
     throw new MentoringApiError("VITE_AI_API_BASE_URL is not set", 0);
   }
-  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  
+  const url = path.startsWith("http") 
+    ? path 
+    : `${base}${path.startsWith("/") ? path : `/${path}`}`;
+    
   const h = new Headers(init?.headers);
   if (!h.has("Content-Type") && init?.body) {
     h.set("Content-Type", "application/json");

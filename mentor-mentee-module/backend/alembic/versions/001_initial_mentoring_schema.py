@@ -24,6 +24,18 @@ def upgrade() -> None:
     conn = op.get_bind()
     insp = inspect(conn)
     existing_tables = insp.get_table_names()
+    
+    if "users" not in existing_tables:
+        op.create_table(
+            "users",
+            sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
+            sa.Column("email", sa.Text(), nullable=False),
+            sa.Column("password_hash", sa.Text(), nullable=False),
+            sa.Column("role", sa.String(length=32), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.PrimaryKeyConstraint("user_id", name=op.f("pk_users")),
+            sa.UniqueConstraint("email", name=op.f("uq_users_email")),
+        )
 
     if "mentor_tiers" not in existing_tables:
         op.create_table(
@@ -39,6 +51,7 @@ def upgrade() -> None:
             "mentee_profiles",
             sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
+            sa.Column("full_name", sa.String(length=255), nullable=True),
             sa.Column(
                 "learning_goals",
                 postgresql.ARRAY(sa.Text()),
@@ -59,6 +72,7 @@ def upgrade() -> None:
             "mentor_profiles",
             sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
+            sa.Column("full_name", sa.String(length=255), nullable=True),
             sa.Column("tier_id", sa.String(length=32), nullable=False),
             sa.Column("is_accepting_requests", sa.Boolean(), server_default=sa.text("true"), nullable=False),
             sa.Column(
@@ -175,15 +189,21 @@ def upgrade() -> None:
     if "mentor_tiers" in existing_tables:
         op.execute(
             sa.text(
-                """
-                INSERT INTO mentor_tiers (tier_id, tier_name, session_credit_cost)
-                SELECT 'PEER', 'Peer', 50 WHERE NOT EXISTS (SELECT 1 FROM mentor_tiers WHERE tier_id = 'PEER');
-                INSERT INTO mentor_tiers (tier_id, tier_name, session_credit_cost)
-                SELECT 'PROFESSIONAL', 'Professional', 100 WHERE NOT EXISTS (SELECT 1 FROM mentor_tiers WHERE tier_id = 'PROFESSIONAL');
-                INSERT INTO mentor_tiers (tier_id, tier_name, session_credit_cost)
-                SELECT 'EXPERT', 'Expert', 250 WHERE NOT EXISTS (SELECT 1 FROM mentor_tiers WHERE tier_id = 'EXPERT');
-                """
-            ),
+                "INSERT INTO mentor_tiers (tier_id, tier_name, session_credit_cost) "
+                "SELECT 'PEER', 'Peer', 50 WHERE NOT EXISTS (SELECT 1 FROM mentor_tiers WHERE tier_id = 'PEER')"
+            )
+        )
+        op.execute(
+            sa.text(
+                "INSERT INTO mentor_tiers (tier_id, tier_name, session_credit_cost) "
+                "SELECT 'PROFESSIONAL', 'Professional', 100 WHERE NOT EXISTS (SELECT 1 FROM mentor_tiers WHERE tier_id = 'PROFESSIONAL')"
+            )
+        )
+        op.execute(
+            sa.text(
+                "INSERT INTO mentor_tiers (tier_id, tier_name, session_credit_cost) "
+                "SELECT 'EXPERT', 'Expert', 250 WHERE NOT EXISTS (SELECT 1 FROM mentor_tiers WHERE tier_id = 'EXPERT')"
+            )
         )
 
 
@@ -194,3 +214,4 @@ def downgrade() -> None:
     op.drop_table("mentor_profiles")
     op.drop_table("mentee_profiles")
     op.drop_table("mentor_tiers")
+    op.drop_table("users")

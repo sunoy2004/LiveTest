@@ -1,7 +1,8 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, or_
+from sqlalchemy.orm import aliased
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -152,26 +153,27 @@ class MentorshipRequestService:
         return [{"id": str(r.id), "title": r.title, "status": r.status} for r in results]
 
     async def get_vault(self, connection_id: uuid.UUID) -> list[dict]:
-        from app.models import MentorshipSession, SessionHistory
+        from app.models import Session as MentorshipSession, SessionHistory, TimeSlot
         stmt = (
-            select(MentorshipSession, SessionHistory)
+            select(MentorshipSession, SessionHistory, TimeSlot)
             .join(SessionHistory, SessionHistory.session_id == MentorshipSession.id)
+            .join(TimeSlot, MentorshipSession.slot_id == TimeSlot.id)
             .where(MentorshipSession.connection_id == connection_id)
-            .order_by(MentorshipSession.start_time.desc())
+            .order_by(TimeSlot.start_time.desc())
         )
         results = (await self._session.execute(stmt)).all()
         out = []
-        for sess, hist in results:
+        for sess, hist, slot in results:
             out.append({
                 "session_id": str(sess.id),
-                "start_time": sess.start_time,
+                "start_time": slot.start_time,
                 "notes": hist.notes_data or {},
                 "mentor_rating": hist.mentor_rating,
                 "mentee_rating": hist.mentee_rating,
             })
         return out
     async def get_session_history_stats(self, connection_id: uuid.UUID) -> list[dict]:
-        from app.models import MentorshipSession, TimeSlot
+        from app.models import Session as MentorshipSession, TimeSlot
         stmt = (
             select(MentorshipSession, TimeSlot)
             .join(TimeSlot, TimeSlot.id == MentorshipSession.slot_id)
@@ -189,7 +191,7 @@ class MentorshipRequestService:
             out.append({
                 "session_id": str(sess.id),
                 "duration_hours": duration,
-                "start_time": sess.start_time.isoformat() if sess.start_time else None
+                "start_time": slot.start_time.isoformat() if slot.start_time else None
             })
         return out
 

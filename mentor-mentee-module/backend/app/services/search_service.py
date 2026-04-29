@@ -45,6 +45,12 @@ class SearchService:
         except ValueError:
             return None
 
+    def _get_display_name(self, full_name: str | None, email: str) -> str:
+        if full_name:
+            return full_name
+        local = email.split("@")[0]
+        return local.replace(".", " ").replace("_", " ").title()
+
     async def _search_mentors(
         self,
         *,
@@ -52,25 +58,27 @@ class SearchService:
         user_id: uuid.UUID | None,
         limit: int,
     ) -> list[SearchResult]:
-        stmt = select(MentorProfile).limit(limit)
+        from app.models import User
+        stmt = select(MentorProfile, User.email).join(User, MentorProfile.user_id == User.user_id).limit(limit)
 
         if user_id is not None:
             stmt = stmt.where(MentorProfile.user_id == user_id)
         else:
             name_match = MentorProfile.full_name.ilike(f"%{query}%")
             expertise_match = MentorProfile.expertise_areas.contains([query])
-            stmt = stmt.where(or_(name_match, expertise_match))
+            email_match = User.email.ilike(f"%{query}%")
+            stmt = stmt.where(or_(name_match, expertise_match, email_match))
 
-        mentors = (await self._session.scalars(stmt)).all()
+        results = (await self._session.execute(stmt)).all()
         return [
             SearchResult(
                 user_id=m.user_id,
-                full_name=m.full_name,
+                full_name=self._get_display_name(m.full_name, email),
                 role=SearchRole.mentor,
                 expertise=list(m.expertise_areas or []),
                 tier=m.tier_id,
             )
-            for m in mentors
+            for m, email in results
         ]
 
     async def _search_mentees(
@@ -80,24 +88,26 @@ class SearchService:
         user_id: uuid.UUID | None,
         limit: int,
     ) -> list[SearchResult]:
-        stmt = select(MenteeProfile).limit(limit)
+        from app.models import User
+        stmt = select(MenteeProfile, User.email).join(User, MenteeProfile.user_id == User.user_id).limit(limit)
 
         if user_id is not None:
             stmt = stmt.where(MenteeProfile.user_id == user_id)
         else:
             name_match = MenteeProfile.full_name.ilike(f"%{query}%")
             goals_match = MenteeProfile.learning_goals.contains([query])
-            stmt = stmt.where(or_(name_match, goals_match))
+            email_match = User.email.ilike(f"%{query}%")
+            stmt = stmt.where(or_(name_match, goals_match, email_match))
 
-        mentees = (await self._session.scalars(stmt)).all()
+        results = (await self._session.execute(stmt)).all()
         return [
             SearchResult(
                 user_id=m.user_id,
-                full_name=m.full_name,
+                full_name=self._get_display_name(m.full_name, email),
                 role=SearchRole.mentee,
                 expertise=list(m.learning_goals or []),
                 tier=None,
             )
-            for m in mentees
+            for m, email in results
         ]
 

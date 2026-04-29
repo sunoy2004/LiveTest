@@ -88,6 +88,8 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint("user_id", name=op.f("pk_mentee_profiles")),
         )
         op.create_index(op.f("ix_mentee_profiles_user_id"), "mentee_profiles", ["user_id"], unique=False)
+        # GIN index for learning_goals array
+        op.execute(sa.text("CREATE INDEX ix_mentee_profiles_learning_goals_gin ON mentee_profiles USING gin (learning_goals)"))
 
     # 4. Mentor Profiles (PK is user_id)
     if "mentor_profiles" in existing_tables:
@@ -119,6 +121,8 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint("user_id", name=op.f("pk_mentor_profiles")),
         )
         op.create_index(op.f("ix_mentor_profiles_user_id"), "mentor_profiles", ["user_id"], unique=False)
+        # GIN index for expertise_areas array
+        op.execute(sa.text("CREATE INDEX ix_mentor_profiles_expertise_areas_gin ON mentor_profiles USING gin (expertise_areas)"))
 
     # 5. Connections (PK is connection_id)
     if "mentorship_connections" not in existing_tables:

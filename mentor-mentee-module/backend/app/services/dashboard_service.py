@@ -35,15 +35,12 @@ class DashboardService:
             }
 
         conn_ids_stmt = select(MentorshipConnection.id).where(
-            MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE
+            MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE,
+            or_(
+                MentorshipConnection.mentee_id == user_id,
+                MentorshipConnection.mentor_id == user_id
+            )
         )
-        conditions = []
-        if mentee_id:
-            conditions.append(MentorshipConnection.mentee_id == mentee_id)
-        if mentor_id:
-            conditions.append(MentorshipConnection.mentor_id == mentor_id)
-        
-        conn_ids_stmt = conn_ids_stmt.where(or_(*conditions))
         conn_ids = (await self._session.execute(conn_ids_stmt)).scalars().all()
 
         if not conn_ids:
@@ -96,21 +93,12 @@ class DashboardService:
             select(MenteeProfile.id).where(MenteeProfile.user_id == user_id)
         )
         mentor_id = await self._session.scalar(
-            select(MentorProfile.id).where(MentorProfile.user_id == user_id)
-        )
-
-        if not mentee_id and not mentor_id:
-            return []
-
-        conditions = []
-        if mentee_id:
-            conditions.append(MentorshipConnection.mentee_id == mentee_id)
-        if mentor_id:
-            conditions.append(MentorshipConnection.mentor_id == mentor_id)
-
         conn_ids_stmt = select(MentorshipConnection.id).where(
-            or_(*conditions),
-            MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE
+            MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE,
+            or_(
+                MentorshipConnection.mentee_id == user_id,
+                MentorshipConnection.mentor_id == user_id
+            )
         )
         conn_ids = (await self._session.execute(conn_ids_stmt)).scalars().all()
 
@@ -147,15 +135,12 @@ class DashboardService:
         mentee_id = await self._session.scalar(select(MenteeProfile.id).where(MenteeProfile.user_id == user_id))
         mentor_id = await self._session.scalar(select(MentorProfile.id).where(MentorProfile.user_id == user_id))
         
-        conditions = []
-        if mentee_id: conditions.append(MentorshipConnection.mentee_id == mentee_id)
-        if mentor_id: conditions.append(MentorshipConnection.mentor_id == mentor_id)
-        
-        if not conditions: return []
-        
         stmt = select(Goal).join(MentorshipConnection).where(
-            or_(*conditions),
-            MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE
+            MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE,
+            or_(
+                MentorshipConnection.mentee_id == user_id,
+                MentorshipConnection.mentor_id == user_id
+            )
         )
         goals = (await self._session.execute(stmt)).scalars().all()
         return [{"id": str(g.id), "title": g.title, "status": g.status} for g in goals]
@@ -165,18 +150,17 @@ class DashboardService:
         mentee_id = await self._session.scalar(select(MenteeProfile.id).where(MenteeProfile.user_id == user_id))
         mentor_id = await self._session.scalar(select(MentorProfile.id).where(MentorProfile.user_id == user_id))
         
-        conditions = []
-        if mentee_id: conditions.append(MentorshipConnection.mentee_id == mentee_id)
-        if mentor_id: conditions.append(MentorshipConnection.mentor_id == mentor_id)
-        
-        if not conditions: return []
-        
         stmt = (
             select(MentorshipSession, SessionHistory, TimeSlot)
             .join(MentorshipConnection, MentorshipSession.connection_id == MentorshipConnection.id)
             .join(SessionHistory, SessionHistory.session_id == MentorshipSession.id)
             .join(TimeSlot, MentorshipSession.slot_id == TimeSlot.id)
-            .where(or_(*conditions))
+            .where(
+                or_(
+                    MentorshipConnection.mentee_id == user_id,
+                    MentorshipConnection.mentor_id == user_id
+                )
+            )
             .order_by(TimeSlot.start_time.desc())
         )
         results = (await self._session.execute(stmt)).all()

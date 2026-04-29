@@ -43,6 +43,53 @@ def _display_name_from_email(email: str | None) -> str:
     return local.replace(".", " ").replace("_", " ").title()
 
 
+async def ensure_connection_synced(db: Session, *, user: User, connection_id: UUID) -> MentorshipConnection:
+    """
+    Ensure the MentorshipConnection exists in users_db with the same ID as mentoring_db.
+    Maps user_ids from Mentoring Service to local Profile IDs.
+    """
+    from app.models import MentorshipConnection
+    
+    # 1. Check local
+    conn = db.query(MentorshipConnection).filter(MentorshipConnection.id == connection_id).first()
+    if conn:
+        return conn
+        
+    # 2. Fetch all connections for this user from Mentoring Service
+    conns = await _fetch_connections_from_service(user.id)
+    match = next((c for c in conns if str(c["id"]) == str(connection_id)), None)
+    
+    if not match:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, 
+            f"Connection {connection_id} not found for user {user.id} in Mentoring Service"
+        )
+        
+    # 3. Create local stub mapping User IDs to local Profile IDs
+    mentor_user_id = UUID(str(match["mentor_user_id"]))
+    mentee_user_id = UUID(str(match["mentee_user_id"]))
+    
+    mentor_p = db.query(MentorProfile).filter(MentorProfile.user_id == mentor_user_id).first()
+    mentee_p = db.query(MenteeProfile).filter(MenteeProfile.user_id == mentee_user_id).first()
+    
+    if not mentor_p or not mentee_p:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, 
+            "Required profiles (mentor/mentee) missing in User Service for this connection"
+        )
+        
+    stub = MentorshipConnection(
+        id=connection_id,
+        mentor_id=mentor_p.id,
+        mentee_id=mentee_p.id,
+        status="ACTIVE"
+    )
+    db.add(stub)
+    db.commit()
+    db.refresh(stub)
+    return stub
+
+
 async def get_connected_mentors_for_mentee(db: Session, *, user: User) -> list[dict]:
     mentee = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
     if not mentee:
@@ -93,15 +140,15 @@ async def get_available_slots_for_mentor(
     if not mentee:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentee profile not found")
 
+    # This will throw 404 if not found or 403-ish if the user isn't part of it
     conns = await _fetch_connections_from_service(user.id)
-    conn = None
-    for c in conns:
-        if str(c["mentee_user_id"]) == str(user.id) and str(c["mentor_user_id"]) == str(mentor_id):
-            conn = c
-            break
+    conn_data = next((c for c in conns if str(c["mentor_user_id"]) == str(mentor_id)), None)
     
-    if not conn:
+    if not conn_data:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not connected to this mentor")
+
+    # Sync it locally so we can create booking requests against it
+    await ensure_connection_synced(db, user=user, connection_id=UUID(str(conn_data["id"])))
 
 
 
@@ -143,6 +190,9 @@ async def book_session_simple(
         connection_id,
         slot_id,
     )
+    # Ensure the connection exists locally before creating the booking request
+    await ensure_connection_synced(db, user=user, connection_id=connection_id)
+    
     return await create_session_booking_request(
         db,
         user=user,

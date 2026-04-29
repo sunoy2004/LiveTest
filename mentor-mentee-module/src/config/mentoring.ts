@@ -70,6 +70,26 @@ export function getMentoringApiBaseUrl(): string {
   return mentoringProxyBase();
 }
 
+/** 
+ * Mentorship Domain Authority (Profiles, Connections, Requests).
+ * Directs traffic to the Mentoring Service to ensure data consistency in mentoring.
+
+ */
+export function getMentoringDomainBaseUrl(): string {
+  const mentoringUrl = (import.meta.env.VITE_MENTORING_API_BASE_URL as string | undefined)?.trim();
+  if (mentoringUrl) {
+    const normalized = mentoringUrl.replace(/\/$/, "");
+    if (!isLikelyMisconfiguredLocalMentoringUrl(normalized) && !isBareSameOriginAsPage(normalized)) {
+      return normalized;
+    }
+  }
+  
+  // Fallback to the same-origin proxy /mentoring-service (which we added to Nginx)
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/mentoring-service`.replace(/\/$/, "");
+}
+
+
 
 
 /** AI Matching / Graph service — Workflow 2: GET /recommendations (not routed through Mentoring API). */
@@ -87,22 +107,21 @@ export function isAiApiConfigured(): boolean {
 
 /** Architecture §3 — REST paths (all under /api/v1). */
 export const mentoringPaths = {
-  profilesMe: `${MENTORING_API_PREFIX}/profiles/me`,
-  profilesMentee: `${MENTORING_API_PREFIX}/profiles/mentee`,
-  search: `${MENTORING_API_PREFIX}/search`,
+  profilesMe: `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/profiles/me`,
+  profilesMentee: `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/profiles/mentee`,
+  search: `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/search`,
   schedulingAvailability: (mentorId: string) =>
-    `${MENTORING_API_PREFIX}/scheduling/availability?mentor_id=${encodeURIComponent(mentorId)}`,
-  schedulingBook: `${MENTORING_API_PREFIX}/scheduling/book`,
-  dashboardUpcomingSession: `${MENTORING_API_PREFIX}/dashboard/upcoming-session`,
-  dashboardGoals: `${MENTORING_API_PREFIX}/dashboard/goals`,
-  dashboardVault: `${MENTORING_API_PREFIX}/dashboard/vault`,
-  /** Workflow 2 — mentorship request pitch (Gateway); Architecture lists domain under relationship engine. */
-  requests: `${MENTORING_API_PREFIX}/requests`,
+    `${getMentoringApiBaseUrl()}${MENTORING_API_PREFIX}/scheduling/availability?mentor_id=${encodeURIComponent(mentorId)}`,
+  schedulingBook: `${getMentoringApiBaseUrl()}${MENTORING_API_PREFIX}/scheduling/book`,
+  dashboardUpcomingSession: `${getMentoringApiBaseUrl()}${MENTORING_API_PREFIX}/dashboard/upcoming-session`,
+  dashboardGoals: `${getMentoringApiBaseUrl()}${MENTORING_API_PREFIX}/dashboard/goals`,
+  dashboardVault: `${getMentoringApiBaseUrl()}${MENTORING_API_PREFIX}/dashboard/vault`,
+  /** Workflow 2 — mentorship request pitch (Mentoring Service authority). */
+  requests: `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/requests`,
   requestStatus: (requestId: string) =>
-    `${MENTORING_API_PREFIX}/requests/${encodeURIComponent(requestId)}/status`,
-
+    `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/requests/${encodeURIComponent(requestId)}/status`,
   sessionHistory: (sessionId: string) =>
-    `${MENTORING_API_PREFIX}/sessions/${encodeURIComponent(sessionId)}/history`,
+    `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/sessions/${encodeURIComponent(sessionId)}/history`,
   /** User Service admin surface (not under mentoring prefix); use with `VITE_USER_SERVICE_URL`. */
   adminTier: (tierId: string) => `/admin/tiers/${encodeURIComponent(tierId)}`,
   adminRevokeConsent: (menteeId: string) =>
@@ -110,6 +129,7 @@ export const mentoringPaths = {
   adminResolveDispute: (disputeId: string) =>
     `/admin/disputes/${encodeURIComponent(disputeId)}/resolve`,
 } as const;
+
 
 /** Workflow 2 — AI discovery endpoint (relative to VITE_AI_API_BASE_URL). */
 export const aiPaths = {

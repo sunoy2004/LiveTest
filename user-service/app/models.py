@@ -67,6 +67,7 @@ class MenteeProfile(Base):
         primary_key=True,
         nullable=False,
         index=True,
+    )
     id = synonym("user_id")
     first_name = Column(String(128), nullable=True)
     last_name = Column(String(128), nullable=True)

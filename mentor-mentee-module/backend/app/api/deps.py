@@ -51,10 +51,10 @@ async def require_user_id(
         await db.commit()
         
         return uid
-    except (ValueError, KeyError, uuid.UUID) as e:
+    except (ValueError, KeyError) as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e) if isinstance(e, ValueError) else "Invalid token payload",
+            detail="Invalid or expired token",
         )
 
 

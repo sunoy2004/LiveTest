@@ -12,10 +12,9 @@ from app.seed import seed_if_empty
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if os.getenv("SKIP_SEED", "false").lower() not in ("true", "1", "yes"):
-        Base.metadata.create_all(bind=engine)
-        apply_schema_patches()
-        seed_if_empty()
+    Base.metadata.create_all(bind=engine)
+    apply_schema_patches()
+    seed_if_empty()
     from app.realtime.redis_listener import start_listener, stop_listener
 
     await start_listener()

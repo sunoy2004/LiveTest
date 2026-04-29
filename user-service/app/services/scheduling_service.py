@@ -1,54 +1,39 @@
 from __future__ import annotations
+
 import logging
+import os
 import uuid
 from uuid import UUID
+
+import httpx
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 
-from app.models import MenteeProfile, MentorProfile, MentorshipConnection, TimeSlot, User
+from app.models import MenteeProfile, MentorProfile, TimeSlot, User
 from app.services.mentor_pricing import resolve_mentor_session_price
 from app.services.session_booking_request_service import create_session_booking_request
 
 log = logging.getLogger(__name__)
 
+MENTORING_SERVICE_URL = os.getenv(
+    "MENTORING_SERVICE_URL", 
+    "https://mentoring-service-1095720168864-1095720168864.us-central1.run.app"
+)
 
-def _fetch_connections_from_db(mentoring_db: Session, user_id: uuid.UUID) -> list[dict]:
-    """Directly query Mentoring DB for active connections for a user."""
-    # First find the profile IDs in the mentoring DB
-    mentor = mentoring_db.query(MentorProfile).filter(MentorProfile.user_id == user_id).first()
-    mentee = mentoring_db.query(MenteeProfile).filter(MenteeProfile.user_id == user_id).first()
-    
-    mentor_id = mentor.id if mentor else None
-    mentee_id = mentee.id if mentee else None
-    
-    if not mentor_id and not mentee_id:
-        return []
 
-    q = (
-        mentoring_db.query(MentorshipConnection, MentorProfile.user_id.label("m_uid"), MenteeProfile.user_id.label("me_uid"))
-        .join(MentorProfile, MentorshipConnection.mentor_id == MentorProfile.id)
-        .join(MenteeProfile, MentorshipConnection.mentee_id == MenteeProfile.id)
-        .filter(
-            or_(
-                MentorshipConnection.mentor_id == mentor_id,
-                MentorshipConnection.mentee_id == mentee_id
-            ),
-            MentorshipConnection.status == "ACTIVE"
-        )
-    )
-    
-    out = []
-    for conn, m_uid, me_uid in q.all():
-        out.append({
-            "id": str(conn.id),
-            "mentee_id": str(conn.mentee_id),
-            "mentor_id": str(conn.mentor_id),
-            "mentee_user_id": str(me_uid),
-            "mentor_user_id": str(m_uid),
-            "status": "ACTIVE"
-        })
-    return out
+async def _fetch_connections_from_service(user_id: uuid.UUID) -> list[dict]:
+    """Call Mentoring Service to get active connections for a user."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                f"{MENTORING_SERVICE_URL}/api/v1/requests/connections",
+                headers={"X-User-Id": str(user_id)}
+            )
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    return []
 
 
 def _display_name_from_email(email: str | None) -> str:
@@ -58,15 +43,16 @@ def _display_name_from_email(email: str | None) -> str:
     return local.replace(".", " ").replace("_", " ").title()
 
 
-async def get_connected_mentors_for_mentee(db: Session, mentoring_db: Session, *, user: User) -> list[dict]:
+async def get_connected_mentors_for_mentee(db: Session, *, user: User) -> list[dict]:
     mentee = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
     if not mentee:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentee profile not found")
 
-    conns = _fetch_connections_from_db(mentoring_db, user.id)
+    conns = await _fetch_connections_from_service(user.id)
     out: list[dict] = []
     
     for conn in conns:
+        # The Mentoring Service returns connections where the user is either mentor or mentee.
         # We use mentor_user_id/mentee_user_id for reliable mapping across services.
         if str(conn["mentee_user_id"]) != str(user.id):
             continue
@@ -99,7 +85,6 @@ async def get_connected_mentors_for_mentee(db: Session, mentoring_db: Session, *
 
 async def get_available_slots_for_mentor(
     db: Session,
-    mentoring_db: Session,
     *,
     user: User,
     mentor_id: UUID,
@@ -108,20 +93,17 @@ async def get_available_slots_for_mentor(
     if not mentee:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentee profile not found")
 
-    conns = _fetch_connections_from_db(mentoring_db, user.id)
+    conns = await _fetch_connections_from_service(user.id)
     conn = None
     for c in conns:
-        # Check if connected (mentor_id here is User Profile ID from User DB)
-        # We need to map it back to user_id to check against conn["mentor_user_id"]
-        mentor_p = db.query(MentorProfile).filter(MentorProfile.id == mentor_id).first()
-        if not mentor_p:
-            continue
-        if str(c["mentee_user_id"]) == str(user.id) and str(c["mentor_user_id"]) == str(mentor_p.user_id):
+        if str(c["mentee_user_id"]) == str(user.id) and str(c["mentor_user_id"]) == str(mentor_id):
             conn = c
             break
     
     if not conn:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not connected to this mentor")
+
+
 
     mentor = db.query(MentorProfile).filter(MentorProfile.id == mentor_id).first()
     if not mentor:

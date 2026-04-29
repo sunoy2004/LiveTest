@@ -1,8 +1,6 @@
 import { AUTH_TOKEN_KEY, AUTH_USER_KEY } from "@/lib/authStorage";
 import { getAiApiBaseUrl, getMentoringApiBaseUrl } from "@/config/mentoring";
 
-const USER_ID_HEADER = "X-User-Id";
-const ADMIN_HEADER = "X-Is-Admin";
 
 function readShellAuthHeaders(): { token: string | null; userId: string | null } {
   try {
@@ -32,19 +30,9 @@ function mentoringHeaders(extra?: HeadersInit): Headers {
   if (!h.has("Content-Type")) {
     h.set("Content-Type", "application/json");
   }
-  const { token, userId } = readShellAuthHeaders();
+  const { token } = readShellAuthHeaders();
   if (token && !h.has("Authorization")) {
     h.set("Authorization", `Bearer ${token}`);
-  }
-  if (userId && !h.has(USER_ID_HEADER)) {
-    h.set(USER_ID_HEADER, userId);
-  }
-  const devUserId = import.meta.env.VITE_DEV_USER_ID;
-  if (devUserId && !h.has(USER_ID_HEADER)) {
-    h.set(USER_ID_HEADER, devUserId);
-  }
-  if (import.meta.env.VITE_DEV_IS_ADMIN === "true" && !h.has(ADMIN_HEADER)) {
-    h.set(ADMIN_HEADER, "true");
   }
   return h;
 }
@@ -111,16 +99,9 @@ export async function aiFetch(path: string, init?: RequestInit): Promise<Respons
   if (!h.has("Content-Type") && init?.body) {
     h.set("Content-Type", "application/json");
   }
-  const { token, userId } = readShellAuthHeaders();
+  const { token } = readShellAuthHeaders();
   if (token && !h.has("Authorization")) {
     h.set("Authorization", `Bearer ${token}`);
-  }
-  if (userId && !h.has(USER_ID_HEADER)) {
-    h.set(USER_ID_HEADER, userId);
-  }
-  const devUserId = import.meta.env.VITE_DEV_USER_ID;
-  if (devUserId && !h.has(USER_ID_HEADER)) {
-    h.set(USER_ID_HEADER, devUserId);
   }
   return fetch(url, { ...init, headers: h });
 }

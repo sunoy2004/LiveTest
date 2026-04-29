@@ -38,7 +38,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             detail="Invalid email or password",
         )
     pub = build_user_public(db, user=user)
-    token = auth.create_token(user.id, is_admin=pub.is_admin)
+    token = auth.create_token(user.id, user.email, user.role, is_admin=pub.is_admin)
     return LoginResponse(
         token=token,
         user=pub,

@@ -10,21 +10,52 @@ from app.services.profile_service import ProfileService
 from app.services.search_service import SearchService
 
 
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from app.core import auth
+
+security = HTTPBearer(auto_error=False)
+
+from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert
+from app.models.user import User
+
 async def require_user_id(
-    x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> uuid.UUID:
-    if not x_user_id or not x_user_id.strip():
+    if creds is None or creds.scheme.lower() != "bearer":
         raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            detail="X-User-Id header is required",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
         )
     try:
-        return uuid.UUID(x_user_id.strip())
-    except ValueError as e:
+        payload = auth.verify_token(creds.credentials)
+        uid = uuid.UUID(payload["user_id"])
+        
+        # Sync User replica
+        # Architecture Rule: Mentoring DB keeps a replica of users
+        # user_id is the universal identifier
+        stmt = insert(User).values(
+            user_id=uid,
+            email=payload["email"],
+            role=payload["role"],
+            password_hash="[REDACTED]" # Not needed in replica but schema requires it
+        ).on_conflict_do_update(
+            index_elements=[User.user_id],
+            set_={
+                "email": payload["email"],
+                "role": payload["role"]
+            }
+        )
+        await db.execute(stmt)
+        await db.commit()
+        
+        return uid
+    except (ValueError, KeyError, uuid.UUID) as e:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Invalid X-User-Id (must be UUID)",
-        ) from e
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e) if isinstance(e, ValueError) else "Invalid token payload",
+        )
 
 
 async def get_profile_service(

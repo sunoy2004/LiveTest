@@ -13,9 +13,11 @@ from app.models.time_slot import TimeSlot
 from app.models.session import Session
 from app.models.goal import Goal
 from app.models.session_history import SessionHistory
+from app.models.user import User
 
 __all__ = [
     "Base",
+    "User",
     "GuardianConsentStatus",
     "MenteeProfile",
     "MentorProfile",

@@ -18,6 +18,7 @@ class MentorProfile(Base, UUIDMixin):
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
         unique=True,
         nullable=False,
         index=True,

@@ -24,6 +24,8 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_token(
     user_id: UUID,
+    email: str,
+    role: str,
     *,
     is_admin: bool = False,
 ) -> str:
@@ -32,6 +34,8 @@ def create_token(
     exp = iat + ACCESS_TOKEN_EXPIRE_MINUTES * 60
     payload: dict[str, Any] = {
         "user_id": str(user_id),
+        "email": email,
+        "role": role,
         "is_admin": is_admin,
         "iat": iat,
         "exp": exp,

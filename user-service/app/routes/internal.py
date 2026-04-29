@@ -31,10 +31,10 @@ def internal_user_names(
     db: Session = Depends(get_db),
 ):
     from app.models import User
-    rows = db.query(User.id, User.email).all()
+    rows = db.query(User.user_id, User.email).all()
     # display name from email
     def _display_name(email: str) -> str:
         local = email.split("@", 1)[0]
         return local.replace("_", " ").replace(".", " ").title()
         
-    return {str(r.id): _display_name(r.email) for r in rows}
+    return {str(r.user_id): _display_name(r.email) for r in rows}

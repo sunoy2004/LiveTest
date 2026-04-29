@@ -103,13 +103,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(msg);
     }
     const data = (await res.json()) as {
-      token: string;
-      user: AuthUser;
+      access_token: string;
     };
-    persistAuth(data.token, data.user);
-    setToken(data.token);
-    setUser(data.user);
-    return data.user;
+    
+    // Decode JWT payload
+    const token = data.access_token;
+    const payloadBase64 = token.split('.')[1];
+    const decodedPayload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+    
+    const newUser: AuthUser = {
+      id: decodedPayload.user_id,
+      email: decodedPayload.email,
+      is_admin: decodedPayload.is_admin
+    };
+
+    persistAuth(token, newUser);
+    setToken(token);
+    setUser(newUser);
+    return newUser;
   }, []);
 
   const value = React.useMemo(

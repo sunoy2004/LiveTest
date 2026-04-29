@@ -16,10 +16,16 @@ def hash_password(plain: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    """Verify password against hash. Supports bcrypt and plain-text fallback for demo data."""
     try:
-        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
-    except ValueError:
-        return False
+        # Standard bcrypt check
+        if hashed.startswith("$2") or len(hashed) > 32: # Likely a hash
+            return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except (ValueError, TypeError):
+        pass
+    
+    # Fallback: exact match (useful for seeded/demo accounts with plain text 'passwords')
+    return plain == hashed
 
 
 def create_token(

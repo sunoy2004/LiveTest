@@ -21,8 +21,7 @@ class UserPublic(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    token: str
-    user: UserPublic
+    access_token: str
 
 
 class MeResponse(BaseModel):

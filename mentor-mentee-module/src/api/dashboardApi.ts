@@ -5,7 +5,7 @@ import type {
   UpcomingSessionResponse,
   VaultItemResponse,
 } from "@/types/dashboard";
-import { getUserServiceBase } from "@/api/userService";
+import { getMentoringApiBaseUrl, MENTORING_API_PREFIX } from "@/config/mentoring";
 
 function dashboardHeaders(token: string): HeadersInit {
   return {
@@ -14,28 +14,15 @@ function dashboardHeaders(token: string): HeadersInit {
   };
 }
 
-export async function fetchDashboardUpcoming(
-  token: string,
-  context: "mentor" | "mentee",
-): Promise<UpcomingSessionResponse> {
-  const q = new URLSearchParams({ context });
-  const res = await fetch(`${getUserServiceBase()}/api/v1/dashboard/upcoming-session?${q}`, {
-    headers: dashboardHeaders(token),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || `Upcoming session failed (${res.status})`);
-  }
-  return res.json() as Promise<UpcomingSessionResponse>;
-}
+const DASHBOARD_BASE = `${getMentoringApiBaseUrl()}${MENTORING_API_PREFIX}/dashboard`;
 
 export async function fetchDashboardUpcomingSessions(
   token: string,
   context: "mentor" | "mentee",
   limit = 5,
 ): Promise<UpcomingSessionItemResponse[]> {
-  const q = new URLSearchParams({ context, limit: String(limit) });
-  const res = await fetch(`${getUserServiceBase()}/api/v1/dashboard/upcoming-sessions?${q}`, {
+  const q = new URLSearchParams({ limit: String(limit) });
+  const res = await fetch(`${DASHBOARD_BASE}/upcoming-sessions?${q}`, {
     headers: dashboardHeaders(token),
   });
   if (!res.ok) {
@@ -49,8 +36,7 @@ export async function fetchDashboardGoals(
   token: string,
   context: "mentor" | "mentee",
 ): Promise<GoalItemResponse[]> {
-  const q = new URLSearchParams({ context });
-  const res = await fetch(`${getUserServiceBase()}/api/v1/dashboard/goals?${q}`, {
+  const res = await fetch(`${DASHBOARD_BASE}/goals`, {
     headers: dashboardHeaders(token),
   });
   if (!res.ok) {
@@ -64,8 +50,7 @@ export async function fetchDashboardVault(
   token: string,
   context: "mentor" | "mentee",
 ): Promise<VaultItemResponse[]> {
-  const q = new URLSearchParams({ context });
-  const res = await fetch(`${getUserServiceBase()}/api/v1/dashboard/vault?${q}`, {
+  const res = await fetch(`${DASHBOARD_BASE}/vault`, {
     headers: dashboardHeaders(token),
   });
   if (!res.ok) {
@@ -79,8 +64,7 @@ export async function fetchDashboardStats(
   token: string,
   context: "mentor" | "mentee",
 ): Promise<DashboardStatsResponse> {
-  const q = new URLSearchParams({ context });
-  const res = await fetch(`${getUserServiceBase()}/api/v1/dashboard/stats?${q}`, {
+  const res = await fetch(`${DASHBOARD_BASE}/stats`, {
     headers: dashboardHeaders(token),
   });
   if (!res.ok) {

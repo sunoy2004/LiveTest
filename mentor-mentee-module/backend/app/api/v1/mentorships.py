@@ -27,21 +27,16 @@ from app.models import (
 router = APIRouter()
 
 
+from typing import Annotated
+from app.api.deps import require_user_id
+
 @router.get("/count")
 async def get_active_mentorship_count(
-    user_id: uuid.UUID = Query(..., description="The user_id to look up"),
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
-    Return the count of ACTIVE mentorship connections for a user.
-
-    Logic:
-      - Find mentee_profiles.id WHERE user_id = :user_id
-      - Find mentor_profiles.id WHERE user_id = :user_id
-      - COUNT(*) FROM mentorship_connections
-        WHERE (mentee_id = :mentee_id OR mentor_id = :mentor_id) AND status = 'ACTIVE'
-
-    If user is both mentor and mentee, both roles are counted.
+    Return the count of ACTIVE mentorship connections for the authenticated user.
     """
     mentee = await db.scalar(
         select(MenteeProfile.id).where(MenteeProfile.user_id == user_id)
@@ -53,7 +48,6 @@ async def get_active_mentorship_count(
     if mentee is None and mentor is None:
         return {"active_mentorships": 0}
 
-    # Build OR conditions based on which profiles exist
     conditions = []
     if mentee is not None:
         conditions.append(MentorshipConnection.mentee_id == mentee)
@@ -74,22 +68,11 @@ async def get_active_mentorship_count(
 
 @router.get("/mentors")
 async def get_active_mentors_for_user(
-    user_id: uuid.UUID = Query(..., description="The mentee user_id to look up"),
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
-    Return mentor user_ids for a user's ACTIVE mentorship connections.
-
-    Logic:
-      - Find mentee_profiles.id WHERE user_id = :user_id
-      - SELECT mentor_profiles.user_id AS mentor_user_id
-        FROM mentorship_connections mc
-        JOIN mentor_profiles mt ON mc.mentor_id = mt.id
-        JOIN mentee_profiles mp ON mc.mentee_id = mp.id
-        WHERE mp.user_id = :user_id AND mc.status = 'ACTIVE'
-
-    Returns:
-      { "mentors": ["mentor_user_id_1", "mentor_user_id_2", ...] }
+    Return mentor user_ids for the authenticated user's ACTIVE mentorship connections.
     """
     mentee = await db.scalar(
         select(MenteeProfile.id).where(MenteeProfile.user_id == user_id)
@@ -115,19 +98,11 @@ async def get_active_mentors_for_user(
 
 @router.get("/mentees")
 async def get_active_mentees_for_user(
-    user_id: uuid.UUID = Query(..., description="The mentor user_id to look up"),
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
-    Return mentee user_ids for a user's ACTIVE mentorship connections.
-
-    Logic:
-      - Find mentor_profiles.id WHERE user_id = :user_id
-      - SELECT mentee_profiles.user_id AS mentee_user_id
-        FROM mentorship_connections mc
-        JOIN mentee_profiles me ON mc.mentee_id = me.id
-        JOIN mentor_profiles mt ON mc.mentor_id = mt.id
-        WHERE mt.user_id = :user_id AND mc.status = 'ACTIVE'
+    Return mentee user_ids for the authenticated user's ACTIVE mentorship connections.
     """
     mentor = await db.scalar(
         select(MentorProfile.id).where(MentorProfile.user_id == user_id)

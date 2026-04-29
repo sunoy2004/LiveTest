@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
 from app.models.base import Base, UUIDMixin
 
@@ -13,16 +13,18 @@ if TYPE_CHECKING:
     from app.models.mentorship_request import MentorshipRequest
 
 
-class MentorProfile(Base, UUIDMixin):
+class MentorProfile(Base):
     __tablename__ = "mentor_profiles"
 
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "user_id",
         UUID(as_uuid=True),
         ForeignKey("users.user_id", ondelete="CASCADE"),
-        unique=True,
+        primary_key=True,
         nullable=False,
         index=True,
     )
+    user_id = synonym("id")
     full_name: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,

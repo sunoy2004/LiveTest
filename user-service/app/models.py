@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import ARRAY, Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 
 from app.db import Base
 
@@ -11,7 +11,8 @@ from app.db import Base
 class User(Base):
     __tablename__ = "users"
 
-    id = Column("user_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = synonym("user_id")
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(String(32), nullable=False, default="MENTEE")  # MENTOR, MENTEE, BOTH
@@ -44,6 +45,7 @@ class AdminProfile(Base):
         nullable=False,
         index=True,
     )
+    id = synonym("user_id")
 
     user = relationship("User", back_populates="admin_profile")
 
@@ -66,6 +68,7 @@ class MenteeProfile(Base):
         nullable=False,
         index=True,
     )
+    id = synonym("user_id")
 
     learning_goals = Column(ARRAY(String), nullable=True)
     education_level = Column(String(128), nullable=True)
@@ -79,7 +82,7 @@ class MenteeProfile(Base):
     mentorship_requests = relationship(
         "MentorshipRequest",
         back_populates="mentee",
-        foreign_keys="MentorshipRequest.mentee_user_id",
+        foreign_keys="MentorshipRequest.mentee_id",
     )
 
 
@@ -93,6 +96,7 @@ class MentorProfile(Base):
         nullable=False,
         index=True,
     )
+    id = synonym("user_id")
 
     tier_id = Column(String(32), ForeignKey("mentor_tiers.tier_id", ondelete="RESTRICT"), nullable=False)
     # Admin band (TIER_1 | TIER_2 | TIER_3) — row in mentor_tiers with same tier_id supplies default price.
@@ -117,21 +121,23 @@ class MentorProfile(Base):
     mentorship_requests = relationship(
         "MentorshipRequest",
         back_populates="mentor",
-        foreign_keys="MentorshipRequest.mentor_user_id",
+        foreign_keys="MentorshipRequest.mentor_id",
     )
 
 
 class MentorshipRequest(Base):
     __tablename__ = "mentorship_requests"
 
-    request_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mentee_user_id = Column(
+    id = Column("request_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    mentee_id = Column(
+        "mentee_user_id",
         UUID(as_uuid=True),
         ForeignKey("mentee_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    mentor_user_id = Column(
+    mentor_id = Column(
+        "mentor_user_id",
         UUID(as_uuid=True),
         ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
@@ -145,21 +151,23 @@ class MentorshipRequest(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    mentee = relationship("MenteeProfile", foreign_keys=[mentee_user_id], back_populates="mentorship_requests")
-    mentor = relationship("MentorProfile", foreign_keys=[mentor_user_id], back_populates="mentorship_requests")
+    mentee = relationship("MenteeProfile", foreign_keys=[mentee_id], back_populates="mentorship_requests")
+    mentor = relationship("MentorProfile", foreign_keys=[mentor_id], back_populates="mentorship_requests")
 
 
 class MentorshipConnection(Base):
     __tablename__ = "mentorship_connections"
 
-    connection_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mentee_user_id = Column(
+    id = Column("connection_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    mentee_id = Column(
+        "mentee_user_id",
         UUID(as_uuid=True),
         ForeignKey("mentee_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    mentor_user_id = Column(
+    mentor_id = Column(
+        "mentor_user_id",
         UUID(as_uuid=True),
         ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
@@ -172,7 +180,8 @@ class TimeSlot(Base):
     __tablename__ = "time_slots"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mentor_user_id = Column(
+    mentor_id = Column(
+        "mentor_user_id",
         UUID(as_uuid=True),
         ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
@@ -188,20 +197,22 @@ class TimeSlot(Base):
 class Session(Base):
     __tablename__ = "sessions"
 
-    session_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column("session_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     connection_id = Column(
         UUID(as_uuid=True),
         ForeignKey("mentorship_connections.connection_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    mentor_user_id = Column(
+    mentor_id = Column(
+        "mentor_user_id",
         UUID(as_uuid=True),
         ForeignKey("mentor_profiles.user_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
-    mentee_user_id = Column(
+    mentee_id = Column(
+        "mentee_user_id",
         UUID(as_uuid=True),
         ForeignKey("mentee_profiles.user_id", ondelete="SET NULL"),
         nullable=True,

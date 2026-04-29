@@ -18,9 +18,16 @@ if TYPE_CHECKING:
 class Session(Base, UUIDMixin):
     __tablename__ = "sessions"
 
+    # Map the 'id' attribute from UUIDMixin to 'session_id' column
+    id: Mapped[uuid.UUID] = mapped_column(
+        "session_id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
     connection_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("mentorship_connections.id", ondelete="CASCADE"),
+        ForeignKey("mentorship_connections.connection_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

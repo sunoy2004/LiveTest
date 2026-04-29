@@ -17,15 +17,24 @@ if TYPE_CHECKING:
 class MentorshipRequest(Base, UUIDMixin):
     __tablename__ = "mentorship_requests"
 
-    mentee_id: Mapped[uuid.UUID] = mapped_column(
+    # Map the 'id' attribute from UUIDMixin to 'request_id' column
+    id: Mapped[uuid.UUID] = mapped_column(
+        "request_id",
         UUID(as_uuid=True),
-        ForeignKey("mentee_profiles.id", ondelete="CASCADE"),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    mentee_id: Mapped[uuid.UUID] = mapped_column(
+        "mentee_user_id",
+        UUID(as_uuid=True),
+        ForeignKey("mentee_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     mentor_id: Mapped[uuid.UUID] = mapped_column(
+        "mentor_user_id",
         UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.id", ondelete="CASCADE"),
+        ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

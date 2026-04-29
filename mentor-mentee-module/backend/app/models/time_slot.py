@@ -17,8 +17,9 @@ class TimeSlot(Base, UUIDMixin):
     __tablename__ = "time_slots"
 
     mentor_id: Mapped[uuid.UUID] = mapped_column(
+        "mentor_user_id",
         UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.id", ondelete="CASCADE"),
+        ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

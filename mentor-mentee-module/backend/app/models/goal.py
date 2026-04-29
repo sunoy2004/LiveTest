@@ -18,7 +18,7 @@ class Goal(Base, UUIDMixin):
 
     connection_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("mentorship_connections.id", ondelete="CASCADE"),
+        ForeignKey("mentorship_connections.connection_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

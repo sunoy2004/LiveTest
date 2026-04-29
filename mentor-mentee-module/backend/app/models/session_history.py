@@ -17,7 +17,7 @@ class SessionHistory(Base, UUIDMixin):
 
     session_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("sessions.id", ondelete="CASCADE"),
+        ForeignKey("sessions.session_id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
         index=True,

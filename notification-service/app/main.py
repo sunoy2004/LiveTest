@@ -19,7 +19,30 @@ async def lifespan(app: FastAPI):
         await stop_listener()
 
 
+from fastapi.middleware.cors import CORSMiddleware
+import os
+
 app = FastAPI(title="Notification Service", version="1.0.0", lifespan=lifespan)
+
+_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,"
+    "http://localhost:4173,http://127.0.0.1:4173,"
+    "https://common-ui-1095720168864-1095720168864.us-central1.run.app,"
+    "https://mentee-ui-1095720168864-1095720168864.us-central1.run.app"
+)
+_origins_list = [o.strip() for o in _origins.split(",") if o.strip()]
+
+if os.getenv("ALLOW_ALL_CORS", "true").lower() == "true":
+    _origins_list = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins_list,
+    allow_credentials=(_origins_list != ["*"]),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")

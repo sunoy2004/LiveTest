@@ -1,99 +1,45 @@
-# Test users (User Service seed)
+# Test Users (Deterministic Seed)
 
-Password for all non-admin seeded accounts: **`password123`**
+This document contains the 26 deterministic test users seeded across both `users_db` and `mentoring_db`.
 
-On startup, the User Service runs seed routines that **delete every user account except** the allowlist below: **`admin@test.com`**, **`mentor_1@test.com` … `mentor_10@test.com`**, and **`mentee_1@test.com` … `mentee_10@test.com`**. Any other rows (e.g. `mentor@test.com`, `aisha@test.com`, older manual seeds) are removed so the DB matches this document.
+## Mentors
+| Name | Email | Password | Role |
+|------|-------|----------|------|
+| Aarav | aarav@test.com | aarav | MENTOR |
+| Vivaan | vivaan@test.com | vivaan | MENTOR |
+| Arjun | arjun@test.com | arjun | MENTOR |
+| Aditya | aditya@test.com | aditya | MENTOR |
+| Ishaan | ishaan@test.com | ishaan | MENTOR |
+| Rohan | rohan@test.com | rohan | MENTOR |
+| Karan | karan@test.com | karan | MENTOR |
+| Neha | neha@test.com | neha | MENTOR |
+| Ananya | ananya@test.com | ananya | MENTOR |
+| Priya | priya@test.com | priya | MENTOR |
 
-You can also run `python -m app.seed` from the `user-service` folder to apply the same prune + seed without restarting the API.
+## Mentees
+| Name | Email | Password | Role |
+|------|-------|----------|------|
+| Meera | meera@test.com | meera | MENTEE |
+| Kavya | kavya@test.com | kavya | MENTEE |
+| Rahul | rahul@test.com | rahul | MENTEE |
+| Sneha | sneha@test.com | sneha | MENTEE |
+| Aman | aman@test.com | aman | MENTEE |
+| Simran | simran@test.com | simran | MENTEE |
+| Dev | dev@test.com | dev | MENTEE |
+| Aryan | aryan@test.com | aryan | MENTEE |
+| Pooja | pooja@test.com | pooja | MENTEE |
+| Nikhil | nikhil@test.com | nikhil | MENTEE |
 
----
-
-##Gamification admin
-user: admin
-password: admin
-
-
+## Both (Mentor + Mentee)
+| Name | Email | Password | Role |
+|------|-------|----------|------|
+| Tanvi | tanvi@test.com | tanvi | BOTH |
+| Riya | riya@test.com | riya | BOTH |
+| Siddharth | siddharth@test.com | siddharth | BOTH |
+| Varun | varun@test.com | varun | BOTH |
+| Isha | isha@test.com | isha | BOTH |
 
 ## Admin
-
-| Display | Email | Password |
-|--------|-------|----------|
-| Admin | admin@test.com | password |
-
----
-
-## Mentors (10)
-
-| Name (from email) | Email | Password |
-|-------------------|-------|----------|
-| Mentor 1 | mentor_1@test.com | password123 |
-| Mentor 2 | mentor_2@test.com | password123 |
-| Mentor 3 | mentor_3@test.com | password123 |
-| Mentor 4 | mentor_4@test.com | password123 |
-| Mentor 5 | mentor_5@test.com | password123 |
-| Mentor 6 | mentor_6@test.com | password123 |
-| Mentor 7 | mentor_7@test.com | password123 |
-| Mentor 8 | mentor_8@test.com | password123 |
-| Mentor 9 | mentor_9@test.com | password123 |
-| Mentor 10 | mentor_10@test.com | password123 |
-
-**Profile notes (seed):** each mentor has `tier_id` PROFESSIONAL, **Mentor level** `TIER_2`, accepting requests, expertise `Topic area {i}` + Mentoring, `total_hours_mentored = 10 × i`.
-
----
-
-## Mentees (10)
-
-| Name (from email) | Email | Password |
-|-------------------|-------|----------|
-| Mentee 1 | mentee_1@test.com | password123 |
-| Mentee 2 | mentee_2@test.com | password123 |
-| Mentee 3 | mentee_3@test.com | password123 |
-| Mentee 4 | mentee_4@test.com | password123 |
-| Mentee 5 | mentee_5@test.com | password123 |
-| Mentee 6 | mentee_6@test.com | password123 |
-| Mentee 7 | mentee_7@test.com | password123 |
-| Mentee 8 | mentee_8@test.com | password123 |
-| Mentee 9 | mentee_9@test.com | password123 |
-| Mentee 10 | mentee_10@test.com | password123 |
-
-**Wallet (seed):** **Mentee 1–5:** **200** credits (User Service mirror + gamification top-up). **Mentee 6–10:** **500** credits. Requires **GAMIFICATION_SERVICE_URL** for the live ledger; seed calls `GET /balance/{user_id}` then `POST /add` as needed.
-
-**Profile notes (seed):** goals `Learning goal {i}` + Skill growth, undergraduate, guardian consent not required.
-
----
-
-## Mentorship connections (ACTIVE)
-
-Each mentee is connected to the mentor with the **same index** (for straightforward assignment and booking tests).
-
-| Mentor | Mentee | Status |
-|--------|--------|--------|
-| Mentor 1 | Mentee 1 | ACTIVE |
-| Mentor 2 | Mentee 2 | ACTIVE |
-| Mentor 3 | Mentee 3 | ACTIVE |
-| Mentor 4 | Mentee 4 | ACTIVE |
-| Mentor 5 | Mentee 5 | ACTIVE |
-| Mentor 6 | Mentee 6 | ACTIVE |
-| Mentor 7 | Mentee 7 | ACTIVE |
-| Mentor 8 | Mentee 8 | ACTIVE |
-| Mentor 9 | Mentee 9 | ACTIVE |
-| Mentor 10 | Mentee 10 | ACTIVE |
-
----
-
-## Dashboard / scheduling demo data
-
-- **Upcoming sessions, goals, vault sample:** seeded on the **Mentor 1 ↔ Mentee 1** connection (`mentor_1@test.com` / `mentee_1@test.com`).
-- **Bookable slots:** generated for **all** mentors `mentor_1` … `mentor_10` (UTC windows); quick smoke tests often use **Mentor 1**.
-
----
-
-## Reseed / refresh dashboard dummy rows
-
-From `user-service` directory (with `DATABASE_URL` set):
-
-```bash
-python -m app.seed --force
-```
-
-`--force` clears and re-applies dashboard sessions/goals/history for the Mentor 1 ↔ Mentee 1 connection.
+| Name | Email | Password | Role |
+|------|-------|----------|------|
+| admin | admin@test.com | admin | ADMIN |

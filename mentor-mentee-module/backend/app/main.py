@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,10 +19,15 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 allowed_origins = [o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()]
+
+# Enable all origins for local testing
+if os.getenv("ALLOW_ALL_CORS", "true").lower() == "true":
+    allowed_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins or [],
-    allow_credentials=True,
+    allow_credentials=(allowed_origins != ["*"]),
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -11,7 +11,7 @@ from app.db import Base
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column("user_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(String(32), nullable=False, default="MENTEE")  # MENTOR, MENTEE, BOTH
@@ -37,11 +37,10 @@ class User(Base):
 class AdminProfile(Base):
     __tablename__ = "admin_profiles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        unique=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
         nullable=False,
         index=True,
     )
@@ -60,11 +59,10 @@ class MentorTier(Base):
 class MenteeProfile(Base):
     __tablename__ = "mentee_profiles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        unique=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
         nullable=False,
         index=True,
     )
@@ -81,18 +79,17 @@ class MenteeProfile(Base):
     mentorship_requests = relationship(
         "MentorshipRequest",
         back_populates="mentee",
-        foreign_keys="MentorshipRequest.mentee_id",
+        foreign_keys="MentorshipRequest.mentee_user_id",
     )
 
 
 class MentorProfile(Base):
     __tablename__ = "mentor_profiles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        unique=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
         nullable=False,
         index=True,
     )
@@ -120,23 +117,23 @@ class MentorProfile(Base):
     mentorship_requests = relationship(
         "MentorshipRequest",
         back_populates="mentor",
-        foreign_keys="MentorshipRequest.mentor_id",
+        foreign_keys="MentorshipRequest.mentor_user_id",
     )
 
 
 class MentorshipRequest(Base):
     __tablename__ = "mentorship_requests"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mentee_id = Column(
+    request_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    mentee_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentee_profiles.id", ondelete="CASCADE"),
+        ForeignKey("mentee_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    mentor_id = Column(
+    mentor_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.id", ondelete="CASCADE"),
+        ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -148,23 +145,23 @@ class MentorshipRequest(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    mentee = relationship("MenteeProfile", foreign_keys=[mentee_id], back_populates="mentorship_requests")
-    mentor = relationship("MentorProfile", foreign_keys=[mentor_id], back_populates="mentorship_requests")
+    mentee = relationship("MenteeProfile", foreign_keys=[mentee_user_id], back_populates="mentorship_requests")
+    mentor = relationship("MentorProfile", foreign_keys=[mentor_user_id], back_populates="mentorship_requests")
 
 
 class MentorshipConnection(Base):
     __tablename__ = "mentorship_connections"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mentee_id = Column(
+    connection_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    mentee_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentee_profiles.id", ondelete="CASCADE"),
+        ForeignKey("mentee_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    mentor_id = Column(
+    mentor_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.id", ondelete="CASCADE"),
+        ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -175,9 +172,9 @@ class TimeSlot(Base):
     __tablename__ = "time_slots"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mentor_id = Column(
+    mentor_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.id", ondelete="CASCADE"),
+        ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -191,22 +188,22 @@ class TimeSlot(Base):
 class Session(Base):
     __tablename__ = "sessions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     connection_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentorship_connections.id", ondelete="CASCADE"),
+        ForeignKey("mentorship_connections.connection_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    mentor_id = Column(
+    mentor_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.id", ondelete="SET NULL"),
+        ForeignKey("mentor_profiles.user_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
-    mentee_id = Column(
+    mentee_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentee_profiles.id", ondelete="SET NULL"),
+        ForeignKey("mentee_profiles.user_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -231,7 +228,7 @@ class SessionBookingRequest(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     connection_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentorship_connections.id", ondelete="CASCADE"),
+        ForeignKey("mentorship_connections.connection_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -245,7 +242,7 @@ class SessionBookingRequest(Base):
     agreed_cost = Column(Integer, nullable=False)
     session_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("sessions.id", ondelete="SET NULL"),
+        ForeignKey("sessions.session_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -263,7 +260,7 @@ class Goal(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     connection_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentorship_connections.id", ondelete="CASCADE"),
+        ForeignKey("mentorship_connections.connection_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -277,7 +274,7 @@ class SessionHistory(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     session_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("sessions.id", ondelete="CASCADE"),
+        ForeignKey("sessions.session_id", ondelete="CASCADE"),
         unique=True,
         nullable=False,
     )
@@ -294,13 +291,13 @@ class ReportDispute(Base):
     kind = Column(String(64), nullable=False, default="OTHER")
     session_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("sessions.id", ondelete="SET NULL"),
+        ForeignKey("sessions.session_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
     opened_by_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
+        ForeignKey("users.user_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -321,7 +318,7 @@ class CreditLedgerEntry(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

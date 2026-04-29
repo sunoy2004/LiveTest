@@ -10,7 +10,7 @@ DATABASE_URL = os.getenv(
 # Second Database for Mentoring Service Data (Internal Cloud SQL Socket)
 MENTORING_DATABASE_URL = os.getenv(
     "MENTORING_DATABASE_URL",
-    "postgresql://postgres:123456@/mentoring?host=/cloudsql/yanc-website:us-central1:mentor-mentee-db"
+    "postgresql://postgres:123456@/mentoring?host=/cloudsql/yanc-website%3Aus-central1%3Amentor-mentee-db"
 )
 
 class Base(DeclarativeBase):

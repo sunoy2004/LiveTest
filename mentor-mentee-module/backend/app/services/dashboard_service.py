@@ -118,24 +118,25 @@ class DashboardService:
             return []
 
         now = datetime.now(timezone.utc)
-        stmt = select(MentorshipSession).where(
-            MentorshipSession.connection_id.in_(conn_ids),
-            MentorshipSession.status == SessionStatus.SCHEDULED,
-            MentorshipSession.start_time > now
-        ).order_by(MentorshipSession.start_time.asc()).limit(limit)
+        stmt = (
+            select(MentorshipSession, TimeSlot)
+            .join(TimeSlot, MentorshipSession.slot_id == TimeSlot.id)
+            .where(
+                MentorshipSession.connection_id.in_(conn_ids),
+                MentorshipSession.status == SessionStatus.SCHEDULED,
+                TimeSlot.start_time > now
+            )
+            .order_by(TimeSlot.start_time.asc())
+            .limit(limit)
+        )
 
-        sessions = (await self._session.execute(stmt)).scalars().all()
-        
-        # Need to fetch partner names, etc.
-        # For now, return basic info. 
-        # Ideally, we should join with profiles and users to get names.
-        # But User names are in the 'users' replica.
+        rows = (await self._session.execute(stmt)).all()
         
         out = []
-        for s in sessions:
+        for s, slot in rows:
             out.append({
                 "session_id": str(s.id),
-                "start_time": s.start_time,
+                "start_time": slot.start_time,
                 "status": s.status,
                 "connection_id": str(s.connection_id)
             })
@@ -171,17 +172,18 @@ class DashboardService:
         if not conditions: return []
         
         stmt = (
-            select(MentorshipSession, SessionHistory)
+            select(MentorshipSession, SessionHistory, TimeSlot)
             .join(MentorshipConnection, MentorshipSession.connection_id == MentorshipConnection.id)
             .join(SessionHistory, SessionHistory.session_id == MentorshipSession.id)
+            .join(TimeSlot, MentorshipSession.slot_id == TimeSlot.id)
             .where(or_(*conditions))
-            .order_by(MentorshipSession.start_time.desc())
+            .order_by(TimeSlot.start_time.desc())
         )
         results = (await self._session.execute(stmt)).all()
         return [{
             "session_id": str(sess.id),
-            "start_time": sess.start_time,
+            "start_time": slot.start_time,
             "notes": hist.notes_data or {},
             "mentor_rating": hist.mentor_rating,
             "mentee_rating": hist.mentee_rating,
-        } for sess, hist in results]
+        } for sess, hist, slot in results]

@@ -2,8 +2,8 @@ from datetime import datetime, timedelta, timezone
 import os
 import uuid
 from uuid import UUID
-import httpx
 from sqlalchemy.orm import Session
+from sqlalchemy import select, or_
 
 from app.models import (
     Goal,
@@ -43,60 +43,73 @@ def _effective_context(
     return None
 
 
-MENTORING_SERVICE_URL = os.getenv(
-    "MENTORING_SERVICE_URL", 
-    "https://mentoring-service-1095720168864-1095720168864.us-central1.run.app"
-)
+def _fetch_connections_from_db(mentoring_db: Session, user_id: uuid.UUID) -> list[dict]:
+    """Directly query Mentoring DB for active connections for a user."""
+    # First find the profile IDs in the mentoring DB
+    mentor = mentoring_db.query(MentorProfile).filter(MentorProfile.user_id == user_id).first()
+    mentee = mentoring_db.query(MenteeProfile).filter(MenteeProfile.user_id == user_id).first()
+    
+    mentor_id = mentor.id if mentor else None
+    mentee_id = mentee.id if mentee else None
+    
+    if not mentor_id and not mentee_id:
+        return []
+
+    q = (
+        mentoring_db.query(MentorshipConnection, MentorProfile.user_id.label("m_uid"), MenteeProfile.user_id.label("me_uid"))
+        .join(MentorProfile, MentorshipConnection.mentor_id == MentorProfile.id)
+        .join(MenteeProfile, MentorshipConnection.mentee_id == MenteeProfile.id)
+        .filter(
+            or_(
+                MentorshipConnection.mentor_id == mentor_id,
+                MentorshipConnection.mentee_id == mentee_id
+            ),
+            MentorshipConnection.status == "ACTIVE"
+        )
+    )
+    
+    out = []
+    for conn, m_uid, me_uid in q.all():
+        out.append({
+            "id": str(conn.id),
+            "mentee_id": str(conn.mentee_id),
+            "mentor_id": str(conn.mentor_id),
+            "mentee_user_id": str(me_uid),
+            "mentor_user_id": str(m_uid),
+            "status": "ACTIVE"
+        })
+    return out
 
 
-async def _fetch_connections_from_service(user_id: uuid.UUID) -> list[dict]:
-    """Call Mentoring Service to get active connections for a user."""
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(
-                f"{MENTORING_SERVICE_URL}/api/v1/requests/connections",
-                headers={"X-User-Id": str(user_id)}
-            )
-            if resp.status_code == 200:
-                return resp.json()
-    except Exception:
-        pass
-    return []
+def _fetch_admin_all_connections(mentoring_db: Session) -> list[dict]:
+    """Directly query Mentoring DB for all active connections."""
+    q = (
+        mentoring_db.query(MentorshipConnection)
+        .filter(MentorshipConnection.status == "ACTIVE")
+    )
+    return [{
+        "id": str(c.id),
+        "mentee_id": str(c.mentee_id),
+        "mentor_id": str(c.mentor_id),
+        "status": "ACTIVE"
+    } for c in q.all()]
 
 
-async def _fetch_admin_all_connections() -> list[dict]:
-    """Call Mentoring Service to get all active connections for admin view."""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(f"{MENTORING_SERVICE_URL}/api/v1/requests/admin/connections")
-            if resp.status_code == 200:
-                return resp.json()
-    except Exception:
-        pass
-    return []
-
-
-async def resolve_connection(
+def resolve_connection(
     db: Session,
+    mentoring_db: Session,
     *,
     user: User,
     context: str | None,
 ) -> tuple[dict | None, bool | None]:
     """
     Returns (connection_dict, viewer_is_mentor).
-    Fetches connection data from Mentoring Service instead of local DB.
+    Fetches connection data from Mentoring DB instead of API.
     """
-    conns = await _fetch_connections_from_service(user.id)
+    conns = _fetch_connections_from_db(mentoring_db, user.id)
     if not conns:
         return None, None
 
-    # For dashboard simplicity, pick the first active one
-    conn = conns[0]
-    
-    # Check if the user is mentor or mentee based on their user_id
-    # The Mentoring Service returns mentor_id/mentee_id which are PROFILE IDs.
-    # We need to map them back to user_ids to know the context.
-    
     mentor_profile = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
     mentee_profile = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
     
@@ -110,17 +123,15 @@ async def resolve_connection(
     )
     
     if eff == "mentor" and mentor_profile:
-        # Verify the connection matches this mentor by user_id
         for c in conns:
             if str(c["mentor_user_id"]) == str(user.id):
                 return c, True
     
     if eff == "mentee" and mentee_profile:
-        # Verify the connection matches this mentee by user_id
         for c in conns:
             if str(c["mentee_user_id"]) == str(user.id):
                 return c, False
-    
+
     return None, None
 
 
@@ -131,6 +142,7 @@ def _session_price_for_row(
 ) -> int:
     if row.price_charged is not None:
         return int(row.price_charged)
+    # We use mentor_user_id to find the profile in User DB
     mp = (
         db.query(MentorProfile)
         .filter(MentorProfile.user_id == UUID(str(sess_conn["mentor_user_id"])))
@@ -149,10 +161,11 @@ def _mentor_mentee_brief(
     me = db.query(MenteeProfile).filter(MenteeProfile.user_id == mentee_user_id).one()
     mentor_user = db.query(User).filter(User.id == mp.user_id).one()
     mentee_user = db.query(User).filter(User.id == me.user_id).one()
+    
     mentor_brief = {
         "id": mp.id,
         "name": _partner_display_name(mentor_user),
-        "tier": mp.pricing_tier,
+        "expertise": mp.expertise_areas or [],
     }
     mentee_brief = {
         "id": me.id,
@@ -175,29 +188,15 @@ def _partner_user_for_connection(
     return db.query(User).filter(User.id == mentor_user_id).first()
 
 
-async def _active_connection_ids_for_viewer(
-    db: Session,
-    *,
-    user: User,
-    viewer_is_mentor: bool,
-) -> tuple[list[UUID], MentorProfile | None]:
-    conns = await _fetch_connections_from_service(user.id)
+def _active_connection_ids_for_viewer(mentoring_db: Session, *, user: User, viewer_is_mentor: bool) -> list[UUID]:
+    conns = _fetch_connections_from_db(mentoring_db, user.id)
     if not conns:
-        return [], None
+        return []
         
     if viewer_is_mentor:
-        mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
-        if not mp:
-            return [], None
-        # The service already filtered by user_id via header, but we verify by user_id to be safe
-        ids = [UUID(str(c["id"])) for c in conns if str(c["mentor_user_id"]) == str(user.id)]
-        return ids, mp
+        return [UUID(str(c["id"])) for c in conns if str(c["mentor_user_id"]) == str(user.id)]
     else:
-        mep = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
-        if not mep:
-            return [], None
-        ids = [UUID(str(c["id"])) for c in conns if str(c["mentee_user_id"]) == str(user.id)]
-        return ids, None
+        return [UUID(str(c["id"])) for c in conns if str(c["mentee_user_id"]) == str(user.id)]
 
 
 async def _collect_upcoming_payloads(
@@ -209,7 +208,6 @@ async def _collect_upcoming_payloads(
     include_rejected_booking_requests: bool,
     max_items: int,
 ) -> list[dict]:
-    """Merge scheduled sessions with pending (and optionally rejected) session booking requests."""
     cap = max(1, min(max_items, 20))
     sched = (
         db.query(MentorshipSession)
@@ -224,8 +222,6 @@ async def _collect_upcoming_payloads(
 
     booking_pairs: list[tuple[SessionBookingRequest, TimeSlot]] = []
     if viewer_is_mentor and mentor_profile is not None:
-        # We query requests for this mentor. We filter by connection_id.in_(conn_ids) 
-        # to ensure they belong to active connections fetched from the Mentoring Service.
         booking_pairs = (
             db.query(SessionBookingRequest, TimeSlot)
             .join(TimeSlot, TimeSlot.id == SessionBookingRequest.slot_id)
@@ -251,203 +247,142 @@ async def _collect_upcoming_payloads(
             .all()
         )
 
-    events: list[tuple] = []
+    out = []
     for row in sched:
-        events.append((row.start_time, "session", row))
+        out.append({
+            "type": "SESSION",
+            "id": row.id,
+            "connection_id": row.connection_id,
+            "start_time": row.start_time,
+            "status": row.status,
+            "meeting_url": row.meeting_url,
+        })
     for req, slot in booking_pairs:
-        events.append((slot.start_time, "request", (req, slot)))
-    events.sort(key=lambda x: x[0])
+        out.append({
+            "type": "BOOKING_REQUEST",
+            "id": req.id,
+            "connection_id": req.connection_id,
+            "start_time": slot.start_time,
+            "status": req.status,
+            "agreed_cost": req.agreed_cost,
+        })
 
-    out: list[dict] = []
-    for _, kind, payload in events:
-        if len(out) >= cap:
-            break
-        if kind == "session":
-            row = payload
-            # Connection data comes from Mentoring Service via the connection_id in the session
-            # We fetch all connections for the user and find the one matching the session
-            conns = await _fetch_connections_from_service(user.id)
-            sess_conn = next((c for c in conns if str(c["id"]) == str(row.connection_id)), None)
-            if not sess_conn:
-                continue
-                
-            partner = _partner_user_for_connection(
-                db, sess_conn, viewer_is_mentor=viewer_is_mentor
-            )
-            price = _session_price_for_row(db, row, sess_conn)
-            mentor_brief, mentee_brief = _mentor_mentee_brief(db, sess_conn)
-            out.append(
-                {
-                    "session_id": row.id,
-                    "booking_request_id": None,
-                    "start_time": row.start_time,
-                    "meeting_url": row.meeting_url,
-                    "status": row.status,
-                    "partner_name": _partner_display_name(partner),
-                    "session_credit_cost": price,
-                    "price": price,
-                    "mentor": mentor_brief,
-                    "mentee": mentee_brief,
-                }
-            )
-        else:
-            req, slot = payload
-            conns = await _fetch_connections_from_service(user.id)
-            sess_conn = next((c for c in conns if str(c["id"]) == str(req.connection_id)), None)
-            if not sess_conn:
-                continue
-                
-            partner = _partner_user_for_connection(
-                db, sess_conn, viewer_is_mentor=viewer_is_mentor
-            )
-            mentor_brief, mentee_brief = _mentor_mentee_brief(db, sess_conn)
-            ui_status = (
-                "PENDING_APPROVAL" if req.status == "PENDING" else "REJECTED"
-            )
-            cost = int(req.agreed_cost)
-            out.append(
-                {
-                    "session_id": None,
-                    "booking_request_id": req.id,
-                    "start_time": slot.start_time,
-                    "meeting_url": None,
-                    "status": ui_status,
-                    "partner_name": _partner_display_name(partner),
-                    "session_credit_cost": cost,
-                    "price": cost,
-                    "mentor": mentor_brief,
-                    "mentee": mentee_brief,
-                }
-            )
-    return out
+    out.sort(key=lambda x: x["start_time"])
+    return out[:cap]
 
 
-async def get_upcoming_session(
-    db: Session,
-    *,
-    user: User,
-    context: str | None,
-) -> dict | None:
-    conn, viewer_is_mentor = await resolve_connection(db, user=user, context=context)
-    conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
-    if not conn_ids:
-        return None
-
-    rows = await _collect_upcoming_payloads(
-        db,
-        viewer_is_mentor=viewer_is_mentor,
-        conn_ids=conn_ids,
-        mentor_profile=mp,
-        include_rejected_booking_requests=False,
-        max_items=1,
-    )
-    return rows[0] if rows else None
-
-
-async def get_upcoming_sessions(
-    db: Session,
-    *,
-    user: User,
-    context: str | None,
-    limit: int = 5,
-) -> list[dict]:
-    conn, viewer_is_mentor = await resolve_connection(db, user=user, context=context)
-    conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
+async def get_upcoming_sessions(db: Session, mentoring_db: Session, *, user: User, context: str | None, limit: int = 5) -> list[dict]:
+    mentor_profile = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+    mentee_profile = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
+    
+    eff = _effective_context(context=context, has_mentor=mentor_profile is not None, has_mentee=mentee_profile is not None)
+    viewer_is_mentor = (eff == "mentor")
+    
+    conn_ids = _active_connection_ids_for_viewer(mentoring_db, user=user, viewer_is_mentor=viewer_is_mentor)
     if not conn_ids:
         return []
 
-    include_rejected = not viewer_is_mentor
     return await _collect_upcoming_payloads(
         db,
         viewer_is_mentor=viewer_is_mentor,
         conn_ids=conn_ids,
-        mentor_profile=mp,
-        include_rejected_booking_requests=include_rejected,
-        max_items=limit,
+        mentor_profile=mentor_profile if viewer_is_mentor else None,
+        include_rejected_booking_requests=not viewer_is_mentor,
+        max_items=limit
     )
 
 
-async def get_goals(
-    db: Session,
-    *,
-    user: User,
-    context: str | None,
-) -> list[dict]:
-    conn, _ = await resolve_connection(db, user=user, context=context)
+async def get_goals(db: Session, mentoring_db: Session, *, user: User, context: str | None) -> list[dict]:
+    conn, _ = resolve_connection(db, mentoring_db, user=user, context=context)
     if not conn:
         return []
     
-    rows = db.query(Goal).filter(Goal.connection_id == conn.id).all()
-    return [{
-        "id": g.id,
-        "title": g.title,
-        "status": g.status,
-    } for g in rows]
+    # Goals are stored in Mentoring DB
+    results = mentoring_db.query(Goal).filter(Goal.connection_id == UUID(conn["id"])).all()
+    return [{"id": str(g.id), "title": g.title, "status": g.status} for g in results]
 
 
-def _session_duration_hours(db: Session, sess: MentorshipSession) -> float:
-    """Use slot window when present; otherwise assume 1 hour."""
-    if sess.slot_id:
-        slot = db.query(TimeSlot).filter(TimeSlot.id == sess.slot_id).first()
-        if slot and slot.start_time and slot.end_time:
-            delta = slot.end_time - slot.start_time
-            return max(0.0, delta.total_seconds() / 3600.0)
-    return 1.0
+async def get_vault(db: Session, mentoring_db: Session, *, user: User, context: str | None) -> list[dict]:
+    conn, viewer_is_mentor = resolve_connection(db, mentoring_db, user=user, context=context)
+    if not conn:
+        return []
+    
+    # Sessions are in User DB
+    cid = UUID(conn["id"])
+    history = (
+        db.query(MentorshipSession, SessionHistory)
+        .join(SessionHistory, SessionHistory.session_id == MentorshipSession.id)
+        .filter(MentorshipSession.connection_id == cid)
+        .order_by(MentorshipSession.start_time.desc())
+        .all()
+    )
+    
+    out = []
+    for sess, hist in history:
+        out.append({
+            "session_id": str(sess.id),
+            "start_time": sess.start_time,
+            "notes": hist.notes_data or {},
+            "mentor_rating": hist.mentor_rating,
+            "mentee_rating": hist.mentee_rating,
+        })
+    return out
 
 
-async def get_dashboard_stats(
-    db: Session,
-    *,
-    user: User,
-    context: str | None,
-) -> dict:
-    # ADMIN GLOBAL VIEW
+async def get_dashboard_stats(db: Session, mentoring_db: Session, *, user: User, context: str | None) -> dict:
     if user.is_admin:
-        all_conns = await _fetch_admin_all_connections()
+        all_conns = _fetch_admin_all_connections(mentoring_db)
+        # Note: Profiles IDs are DB-specific, but in mentoring DB they are unique mentors/mentees
         unique_mentors = len(set(str(c["mentor_id"]) for c in all_conns))
         unique_mentees = len(set(str(c["mentee_id"]) for c in all_conns))
         
+        # Admin hours/sessions come from User DB
+        history = db.query(MentorshipSession).filter(MentorshipSession.status == "COMPLETED").all()
+        sessions_completed = len(history)
+        
+        active_ct = db.query(MentorshipSession).filter(MentorshipSession.status == "SCHEDULED").count()
+        
         return {
             "active_partners": unique_mentors if context != "mentor" else unique_mentees,
-            "hours_total": 0.0,
-            "hours_this_week": 0.0,
-            "sessions_completed": 0,
-            "active_sessions": len(all_conns),
+            "hours_total": sessions_completed, # Approximation
+            "hours_this_week": 0,
+            "sessions_completed": sessions_completed,
+            "active_sessions": active_ct,
         }
 
-    conn_dict, viewer_is_mentor = await resolve_connection(db, user=user, context=context)
-    conn_ids, mp = await _active_connection_ids_for_viewer(db, user=user, viewer_is_mentor=bool(viewer_is_mentor))
+    mentor_profile = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+    mentee_profile = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
     
+    eff = _effective_context(context=context, has_mentor=mentor_profile is not None, has_mentee=mentee_profile is not None)
+    viewer_is_mentor = (eff == "mentor")
+    
+    conn_ids = _active_connection_ids_for_viewer(mentoring_db, user=user, viewer_is_mentor=viewer_is_mentor)
     if not conn_ids:
         return {
             "active_partners": 0,
-            "hours_total": 0.0,
-            "hours_this_week": 0.0,
+            "hours_total": 0,
+            "hours_this_week": 0,
             "sessions_completed": 0,
             "active_sessions": 0,
         }
 
-    now = datetime.now(timezone.utc)
-    week_ago = now - timedelta(days=7)
-
+    # Hours come from User DB
+    history = db.query(MentorshipSession).filter(
+        MentorshipSession.connection_id.in_(conn_ids),
+        MentorshipSession.status == "COMPLETED"
+    ).all()
+    
+    sessions_completed = len(history)
     hours_total = 0.0
     hours_week = 0.0
-    
-    completed_rows = (
-        db.query(MentorshipSession)
-        .filter(
-            MentorshipSession.connection_id.in_(conn_ids),
-            MentorshipSession.status == "COMPLETED",
-        )
-        .all()
-    )
-    sessions_completed = len(completed_rows)
-    for s in completed_rows:
-        h = _session_duration_hours(db, s)
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+
+    for row in history:
+        # Assuming 1 hour per session for simplicity if slot duration isn't joined
+        h = 1.0
         hours_total += h
-        st = s.start_time
-        if st is not None:
-            st_aware = st if st.tzinfo else st.replace(tzinfo=timezone.utc)
+        if row.start_time:
+            st_aware = row.start_time if row.start_time.tzinfo else row.start_time.replace(tzinfo=timezone.utc)
             if st_aware >= week_ago:
                 hours_week += h
 
@@ -467,39 +402,3 @@ async def get_dashboard_stats(
         "sessions_completed": sessions_completed,
         "active_sessions": active_ct,
     }
-
-
-async def get_vault(
-    db: Session,
-    *,
-    user: User,
-    context: str | None,
-) -> list[dict]:
-    conn, viewer_is_mentor = await resolve_connection(db, user=user, context=context)
-    if not conn:
-        return []
-    
-    # Mentoring Service handles connection_id mapping
-    rows_db = (
-        db.query(SessionHistory, MentorshipSession)
-        .join(MentorshipSession, MentorshipSession.id == SessionHistory.session_id)
-        .filter(MentorshipSession.connection_id == UUID(str(conn["id"])))
-        .all()
-    )
-    
-    partner = _partner_user_for_connection(db, conn, viewer_is_mentor=bool(viewer_is_mentor))
-    partner_name = _partner_display_name(partner)
-    
-    rows = []
-    for history, session in rows_db:
-        rows.append({
-            "session_id": session.id,
-            "start_time": session.start_time,
-            "notes": history.notes_data or {},
-            "mentor_rating": history.mentor_rating,
-            "mentee_rating": history.mentee_rating,
-            "partner_name": partner_name,
-        })
-    return rows
-
-

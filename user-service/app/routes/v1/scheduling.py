@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.db import get_db
+from app.db import get_db, get_mentoring_db
 from app.deps import get_current_user
 from app.models import User
 from app.routes.v1.deps import get_api_v1_user
@@ -14,21 +14,23 @@ router = APIRouter()
 @router.get("/connected-mentors")
 async def get_connected_mentors(
     db: Session = Depends(get_db),
+    mentoring_db: Session = Depends(get_mentoring_db),
     user: User = Depends(get_api_v1_user),
 ):
     """List mentors the current mentee is connected to."""
-    return await scheduling_service.get_connected_mentors_for_mentee(db, user=user)
+    return await scheduling_service.get_connected_mentors_for_mentee(db, mentoring_db, user=user)
 
 
 @router.get("/availability")
 async def get_availability(
     mentor_id: UUID = Query(...),
     db: Session = Depends(get_db),
+    mentoring_db: Session = Depends(get_mentoring_db),
     user: User = Depends(get_api_v1_user),
 ):
     """Mirror of mentoring-service availability endpoint."""
     return await scheduling_service.get_available_slots_for_mentor(
-        db, user=user, mentor_id=mentor_id
+        db, mentoring_db, user=user, mentor_id=mentor_id
     )
 
 

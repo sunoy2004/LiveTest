@@ -224,13 +224,13 @@ async def _collect_upcoming_payloads(
 
     booking_pairs: list[tuple[SessionBookingRequest, TimeSlot]] = []
     if viewer_is_mentor and mentor_profile is not None:
+        # We query requests for this mentor. We filter by connection_id.in_(conn_ids) 
+        # to ensure they belong to active connections fetched from the Mentoring Service.
         booking_pairs = (
             db.query(SessionBookingRequest, TimeSlot)
             .join(TimeSlot, TimeSlot.id == SessionBookingRequest.slot_id)
-            .join(MentorshipConnection, MentorshipConnection.id == SessionBookingRequest.connection_id)
             .filter(
-                MentorshipConnection.mentor_id == mentor_profile.id,
-                MentorshipConnection.status == "ACTIVE",
+                SessionBookingRequest.connection_id.in_(conn_ids),
                 SessionBookingRequest.status == "PENDING",
             )
             .order_by(TimeSlot.start_time.asc())

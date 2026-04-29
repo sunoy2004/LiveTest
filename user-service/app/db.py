@@ -21,8 +21,8 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Mentoring DB (Direct Access via synchronous driver)
-mentoring_engine = create_engine(MENTORING_DATABASE_URL, pool_pre_ping=True)
-MentoringSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=mentoring_engine)
+# mentoring_engine = create_engine(MENTORING_DATABASE_URL, pool_pre_ping=True)
+# MentoringSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=mentoring_engine)
 
 def get_db():
     db = SessionLocal()
@@ -31,9 +31,9 @@ def get_db():
     finally:
         db.close()
 
-def get_mentoring_db():
-    db = MentoringSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# def get_mentoring_db():
+#     db = MentoringSessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()

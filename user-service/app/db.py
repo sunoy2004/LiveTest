@@ -31,9 +31,10 @@ def get_db():
     finally:
         db.close()
 
-# def get_mentoring_db():
-#     db = MentoringSessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
+def get_mentoring_db():
+    # Dummy for debugging
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

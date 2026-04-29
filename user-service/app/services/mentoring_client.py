@@ -72,3 +72,62 @@ async def get_session_history_from_mentoring_service(connection_id: uuid.UUID) -
     except Exception as e:
         logger.error("Failed to fetch session history from Mentoring Service: %s", e)
         return []
+
+
+# ─── NEW DATA CONTRACT CLIENTS ────────────────────────────────────────────────
+# These use the dedicated /mentorships/* endpoints which enforce correct
+# service boundaries (Mentoring Service is sole owner of mentorship data).
+
+
+async def get_active_mentorship_count(user_id: uuid.UUID) -> int:
+    """
+    Call Mentoring Service's dedicated endpoint to get the count of ACTIVE
+    mentorship connections for a user (counting both mentor and mentee roles).
+
+    Falls back to 0 on any failure.
+    """
+    url = f"{MENTORING_SERVICE_URL}/api/v1/mentorships/count"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url, params={"user_id": str(user_id)})
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("active_mentorships", 0)
+            else:
+                logger.warning(
+                    "Mentoring service /mentorships/count returned %d: %s",
+                    response.status_code, response.text,
+                )
+                return 0
+    except Exception as e:
+        logger.error("Failed to fetch active mentorship count: %s", e)
+        return 0
+
+
+async def get_mentor_user_ids(user_id: uuid.UUID) -> List[str]:
+    """
+    Call Mentoring Service's dedicated endpoint to get the list of
+    mentor user_ids for a user's ACTIVE mentorship connections.
+
+    Used by the dashboard to filter upcoming sessions to only those
+    with valid, active mentor relationships.
+
+    Falls back to an empty list on any failure.
+    """
+    url = f"{MENTORING_SERVICE_URL}/api/v1/mentorships/mentors"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url, params={"user_id": str(user_id)})
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("mentors", [])
+            else:
+                logger.warning(
+                    "Mentoring service /mentorships/mentors returned %d: %s",
+                    response.status_code, response.text,
+                )
+                return []
+    except Exception as e:
+        logger.error("Failed to fetch mentor user_ids: %s", e)
+        return []
+

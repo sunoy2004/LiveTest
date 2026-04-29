@@ -503,3 +503,92 @@ async def get_vault(
     return rows
 
 
+# ─── NEW: HYBRID DATA SOURCING (CORRECT SERVICE BOUNDARIES) ──────────────────
+#
+# get_upcoming_sessions_filtered implements the requirement:
+#   Step 1 — Fetch sessions from User Service DB
+#   Step 2 — Get valid mentors from Mentoring Service
+#   Step 3 — Filter sessions to only valid mentor relationships
+#   Step 4 — Return to UI
+
+
+async def get_upcoming_sessions_filtered(
+    db: Session,
+    *,
+    user: User,
+    context: str | None,
+    limit: int = 5,
+) -> list[dict]:
+    """
+    Upcoming sessions with correct service boundaries:
+      - Sessions come from users_db.sessions (User Service DB)
+      - Valid mentor list comes from Mentoring Service API
+      - Sessions are filtered to only those involving active mentors
+
+    This enforces the rule that the User Service NEVER queries Mentoring DB
+    directly for connection data.
+
+    Edge cases:
+      - If no mentors: returns empty list
+      - If Mentoring Service fails: returns empty list (graceful fallback)
+    """
+    from app.services.mentoring_client import get_mentor_user_ids
+
+    # Step 1: Fetch sessions from User Service DB
+    now = datetime.now(timezone.utc)
+    all_sessions = (
+        db.query(MentorshipSession)
+        .filter(
+            MentorshipSession.status == "SCHEDULED",
+            MentorshipSession.start_time > now,
+        )
+        .order_by(MentorshipSession.start_time.asc())
+        .all()
+    )
+
+    if not all_sessions:
+        return []
+
+    # Step 2: Get valid mentors from Mentoring Service
+    mentor_user_ids = await get_mentor_user_ids(user.id)
+    if not mentor_user_ids:
+        return []
+
+    # Convert to set for O(1) lookup
+    valid_mentor_set = set(mentor_user_ids)
+
+    # Step 3: Filter sessions — only keep those with valid mentor relationships
+    cap = max(1, min(limit, 20))
+    filtered: list[dict] = []
+
+    for sess in all_sessions:
+        if len(filtered) >= cap:
+            break
+
+        # Identify the mentor in this session via the connection
+        # The session has mentor_id (profile id) — resolve to user_id
+        if sess.mentor_id:
+            mentor_profile = (
+                db.query(MentorProfile)
+                .filter(MentorProfile.id == sess.mentor_id)
+                .first()
+            )
+            if mentor_profile and str(mentor_profile.user_id) in valid_mentor_set:
+                # This session involves a valid active mentor
+                mentor_user = (
+                    db.query(User)
+                    .filter(User.id == mentor_profile.user_id)
+                    .first()
+                )
+                filtered.append({
+                    "session_id": sess.id,
+                    "start_time": sess.start_time,
+                    "meeting_url": sess.meeting_url,
+                    "status": sess.status,
+                    "mentor_name": _partner_display_name(mentor_user),
+                    "mentor_user_id": str(mentor_profile.user_id),
+                    "price": int(sess.price_charged) if sess.price_charged else None,
+                })
+
+    # Step 4: Return filtered sessions
+    return filtered

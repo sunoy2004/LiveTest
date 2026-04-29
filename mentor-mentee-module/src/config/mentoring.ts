@@ -34,8 +34,28 @@ function mentoringProxyBase(): string {
 
 /** Mentoring FastAPI (expects API Gateway to inject X-User-Id). */
 export function getMentoringApiBaseUrl(): string {
-  // Force all mentoring calls through the user-service proxy to ensure 
-  // User Service DB is the only source of truth for connections/requests.
+  // Production: use the User Service URL because scheduling, dashboard, and
+  // session routes live on the User Service (not the Mentoring Service).
+  // The nginx static server has no backend proxy, so we must hit the backend directly.
+  const userServiceUrl = (import.meta.env.VITE_USER_SERVICE_URL as string | undefined)?.trim();
+  if (userServiceUrl) {
+    const normalized = userServiceUrl.replace(/\/$/, "");
+    if (!isLikelyMisconfiguredLocalMentoringUrl(normalized)) {
+      return normalized;
+    }
+  }
+
+  // Fallback: try VITE_MENTORING_API_BASE_URL (may point to Mentoring Service
+  // which only has /requests, /profiles, /search — not scheduling/dashboard)
+  const mentoringUrl = (import.meta.env.VITE_MENTORING_API_BASE_URL as string | undefined)?.trim();
+  if (mentoringUrl) {
+    const normalized = mentoringUrl.replace(/\/$/, "");
+    if (!isLikelyMisconfiguredLocalMentoringUrl(normalized)) {
+      return normalized;
+    }
+  }
+
+  // Local dev: use same-origin proxy (Vite proxies /user-service → localhost:8000)
   return mentoringProxyBase();
 }
 

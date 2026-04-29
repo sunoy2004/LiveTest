@@ -43,8 +43,7 @@ def apply_schema_patches() -> None:
                 text(
                     """
                     CREATE TABLE admin_profiles (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE
+                        user_id UUID PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE
                     )
                     """
                 )
@@ -72,7 +71,7 @@ def apply_schema_patches() -> None:
                     """
                     UPDATE users u
                     SET is_admin = true
-                    WHERE EXISTS (SELECT 1 FROM admin_profiles ap WHERE ap.user_id = u.id)
+                    WHERE EXISTS (SELECT 1 FROM admin_profiles ap WHERE ap.user_id = u.user_id)
                     """
                 )
             )
@@ -124,9 +123,9 @@ def apply_schema_patches() -> None:
                 text(
                     """
                     CREATE TABLE mentorship_requests (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        mentee_id UUID NOT NULL REFERENCES mentee_profiles(id) ON DELETE CASCADE,
-                        mentor_id UUID NOT NULL REFERENCES mentor_profiles(id) ON DELETE CASCADE,
+                        request_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        mentee_user_id UUID NOT NULL REFERENCES mentee_profiles(user_id) ON DELETE CASCADE,
+                        mentor_user_id UUID NOT NULL REFERENCES mentor_profiles(user_id) ON DELETE CASCADE,
                         status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
                         intro_message TEXT NOT NULL DEFAULT ''
                     )
@@ -135,12 +134,12 @@ def apply_schema_patches() -> None:
             )
             conn.execute(
                 text(
-                    "CREATE INDEX IF NOT EXISTS ix_mentorship_requests_mentee ON mentorship_requests(mentee_id)"
+                    "CREATE INDEX IF NOT EXISTS ix_mentorship_requests_mentee ON mentorship_requests(mentee_user_id)"
                 )
             )
             conn.execute(
                 text(
-                    "CREATE INDEX IF NOT EXISTS ix_mentorship_requests_mentor ON mentorship_requests(mentor_id)"
+                    "CREATE INDEX IF NOT EXISTS ix_mentorship_requests_mentor ON mentorship_requests(mentor_user_id)"
                 )
             )
 
@@ -153,8 +152,8 @@ def apply_schema_patches() -> None:
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         status VARCHAR(32) NOT NULL DEFAULT 'OPEN',
                         kind VARCHAR(64) NOT NULL DEFAULT 'OTHER',
-                        session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
-                        opened_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                        session_id UUID REFERENCES sessions(session_id) ON DELETE SET NULL,
+                        opened_by_user_id UUID REFERENCES users(user_id) ON DELETE SET NULL,
                         payload JSON,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                         resolved_at TIMESTAMPTZ
@@ -222,7 +221,7 @@ def apply_schema_patches() -> None:
                 """
                 DO $$
                 BEGIN
-                    ALTER TABLE sessions ADD COLUMN mentor_id UUID REFERENCES mentor_profiles(id) ON DELETE SET NULL;
+                    ALTER TABLE sessions ADD COLUMN mentor_user_id UUID REFERENCES mentor_profiles(user_id) ON DELETE SET NULL;
                 EXCEPTION WHEN duplicate_column THEN NULL;
                 END $$
                 """
@@ -233,7 +232,7 @@ def apply_schema_patches() -> None:
                 """
                 DO $$
                 BEGIN
-                    ALTER TABLE sessions ADD COLUMN mentee_id UUID REFERENCES mentee_profiles(id) ON DELETE SET NULL;
+                    ALTER TABLE sessions ADD COLUMN mentee_user_id UUID REFERENCES mentee_profiles(user_id) ON DELETE SET NULL;
                 EXCEPTION WHEN duplicate_column THEN NULL;
                 END $$
                 """
@@ -243,11 +242,11 @@ def apply_schema_patches() -> None:
             text(
                 """
                 UPDATE sessions s
-                SET mentor_id = c.mentor_id,
-                    mentee_id = c.mentee_id
+                SET mentor_user_id = c.mentor_user_id,
+                    mentee_user_id = c.mentee_user_id
                 FROM mentorship_connections c
-                WHERE s.connection_id = c.id
-                  AND (s.mentor_id IS NULL OR s.mentee_id IS NULL)
+                WHERE s.connection_id = c.connection_id
+                  AND (s.mentor_user_id IS NULL OR s.mentee_user_id IS NULL)
                 """
             )
         )
@@ -259,11 +258,11 @@ def apply_schema_patches() -> None:
                     """
                     CREATE TABLE session_booking_requests (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        connection_id UUID NOT NULL REFERENCES mentorship_connections(id) ON DELETE CASCADE,
+                        connection_id UUID NOT NULL REFERENCES mentorship_connections(connection_id) ON DELETE CASCADE,
                         slot_id UUID NOT NULL REFERENCES time_slots(id) ON DELETE CASCADE,
                         status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
                         agreed_cost INTEGER NOT NULL,
-                        session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
+                        session_id UUID REFERENCES sessions(session_id) ON DELETE SET NULL,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                         resolved_at TIMESTAMPTZ
                     )

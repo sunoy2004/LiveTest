@@ -51,7 +51,7 @@ def upgrade() -> None:
     # 2. Mentor Tiers
     if "mentor_tiers" in existing_tables:
         if not column_exists("mentor_tiers", "tier_id"):
-            op.drop_table("mentor_tiers", cascade=True)
+            op.execute(sa.text("DROP TABLE mentor_tiers CASCADE"))
             existing_tables.remove("mentor_tiers")
 
     if "mentor_tiers" not in existing_tables:
@@ -66,7 +66,7 @@ def upgrade() -> None:
     # 3. Mentee Profiles (PK is user_id)
     if "mentee_profiles" in existing_tables:
         if not column_exists("mentee_profiles", "user_id"):
-            op.drop_table("mentee_profiles", cascade=True)
+            op.execute(sa.text("DROP TABLE mentee_profiles CASCADE"))
             existing_tables.remove("mentee_profiles")
 
     if "mentee_profiles" not in existing_tables:
@@ -92,7 +92,7 @@ def upgrade() -> None:
     # 4. Mentor Profiles (PK is user_id)
     if "mentor_profiles" in existing_tables:
         if not column_exists("mentor_profiles", "user_id"):
-            op.drop_table("mentor_profiles", cascade=True)
+            op.execute(sa.text("DROP TABLE mentor_profiles CASCADE"))
             existing_tables.remove("mentor_profiles")
 
     if "mentor_profiles" not in existing_tables:

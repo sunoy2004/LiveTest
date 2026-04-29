@@ -9,7 +9,7 @@ from app.services import dashboard_service
 router = APIRouter()
 
 
-@router.get("/upcoming-session")
+@router.get("/upcoming-sessions")
 async def dashboard_upcoming_session(
     context: str | None = Query(None, regex="^(mentor|mentee)$"),
     db: Session = Depends(get_db),

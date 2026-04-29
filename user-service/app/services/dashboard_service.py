@@ -522,42 +522,50 @@ async def get_upcoming_sessions_filtered(
     """
     Upcoming sessions with correct service boundaries:
       - Sessions come from users_db.sessions (User Service DB)
-      - Valid mentor list comes from Mentoring Service API
+      - Valid mentor list comes from Mentoring Service API (/mentors)
       - Sessions are filtered to only those involving active mentors
-
-    This enforces the rule that the User Service NEVER queries Mentoring DB
-    directly for connection data.
-
-    Edge cases:
-      - If no mentors: returns empty list
-      - If Mentoring Service fails: returns empty list (graceful fallback)
     """
     from app.services.mentoring_client import get_mentor_user_ids
 
-    # Step 1: Fetch sessions from User Service DB
+    # Step 1: Identify local profile IDs for the user to filter sessions efficiently
+    mentor_p = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+    mentee_p = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
+    
+    if not mentor_p and not mentee_p:
+        return []
+
+    # Step 2: Fetch valid mentors from Mentoring Service
+    # This enforces that we only show sessions for relationships that are ACTIVE in the Mentoring DB
+    valid_mentors = await get_mentor_user_ids(user.id)
+    if not valid_mentors:
+        return []
+    valid_mentor_set = set(valid_mentors)
+
+    # Step 3: Query sessions belonging to this user
     now = datetime.now(timezone.utc)
-    all_sessions = (
-        db.query(MentorshipSession)
-        .filter(
-            MentorshipSession.status == "SCHEDULED",
-            MentorshipSession.start_time > now,
-        )
-        .order_by(MentorshipSession.start_time.asc())
-        .all()
+    query = db.query(MentorshipSession).filter(
+        MentorshipSession.status == "SCHEDULED",
+        MentorshipSession.start_time > now,
     )
+    
+    # Filter by user's roles
+    if context == "mentor" and mentor_p:
+        query = query.filter(MentorshipSession.mentor_id == mentor_p.id)
+    elif context == "mentee" and mentee_p:
+        query = query.filter(MentorshipSession.mentee_id == mentee_p.id)
+    else:
+        # Both or none specified — show all where user is involved
+        conditions = []
+        if mentor_p:
+            conditions.append(MentorshipSession.mentor_id == mentor_p.id)
+        if mentee_p:
+            conditions.append(MentorshipSession.mentee_id == mentee_p.id)
+        from sqlalchemy import or_
+        query = query.filter(or_(*conditions))
 
-    if not all_sessions:
-        return []
+    all_sessions = query.order_by(MentorshipSession.start_time.asc()).all()
 
-    # Step 2: Get valid mentors from Mentoring Service
-    mentor_user_ids = await get_mentor_user_ids(user.id)
-    if not mentor_user_ids:
-        return []
-
-    # Convert to set for O(1) lookup
-    valid_mentor_set = set(mentor_user_ids)
-
-    # Step 3: Filter sessions — only keep those with valid mentor relationships
+    # Step 4: Final filter and map to frontend format
     cap = max(1, min(limit, 20))
     filtered: list[dict] = []
 
@@ -565,30 +573,48 @@ async def get_upcoming_sessions_filtered(
         if len(filtered) >= cap:
             break
 
-        # Identify the mentor in this session via the connection
-        # The session has mentor_id (profile id) — resolve to user_id
-        if sess.mentor_id:
-            mentor_profile = (
-                db.query(MentorProfile)
-                .filter(MentorProfile.id == sess.mentor_id)
-                .first()
-            )
-            if mentor_profile and str(mentor_profile.user_id) in valid_mentor_set:
-                # This session involves a valid active mentor
-                mentor_user = (
-                    db.query(User)
-                    .filter(User.id == mentor_profile.user_id)
-                    .first()
-                )
-                filtered.append({
-                    "session_id": sess.id,
-                    "start_time": sess.start_time,
-                    "meeting_url": sess.meeting_url,
-                    "status": sess.status,
-                    "mentor_name": _partner_display_name(mentor_user),
-                    "mentor_user_id": str(mentor_profile.user_id),
-                    "price": int(sess.price_charged) if sess.price_charged else None,
-                })
+        # Resolve mentor user_id to check against valid_mentor_set
+        # (Assuming the session mentor_id points to a MentorProfile we have locally)
+        m_profile = db.query(MentorProfile).filter(MentorProfile.id == sess.mentor_id).first()
+        if not m_profile or str(m_profile.user_id) not in valid_mentor_set:
+            continue
 
-    # Step 4: Return filtered sessions
+        # Fetch partner name (if I am mentee, show mentor; if I am mentor, show mentee)
+        is_viewing_as_mentor = (context == "mentor") or (mentor_p and sess.mentor_id == mentor_p.id)
+        partner_user = None
+        if is_viewing_as_mentor:
+            # Show mentee name
+            me_profile = db.query(MenteeProfile).filter(MenteeProfile.id == sess.mentee_id).first()
+            if me_profile:
+                partner_user = db.query(User).filter(User.id == me_profile.user_id).first()
+        else:
+            # Show mentor name
+            partner_user = db.query(User).filter(User.id == m_profile.user_id).first()
+
+        # Build objects for frontend compatibility
+        price = int(sess.price_charged) if sess.price_charged else 0
+        mentor_user = db.query(User).filter(User.id == m_profile.user_id).first()
+        mentee_profile = db.query(MenteeProfile).filter(MenteeProfile.id == sess.mentee_id).first()
+        mentee_user = db.query(User).filter(User.id == mentee_profile.user_id).first() if mentee_profile else None
+
+        filtered.append({
+            "session_id": sess.id,
+            "booking_request_id": None,
+            "start_time": sess.start_time,
+            "meeting_url": sess.meeting_url,
+            "status": sess.status,
+            "partner_name": _partner_display_name(partner_user),
+            "session_credit_cost": price,
+            "price": price,
+            "mentor": {
+                "id": str(m_profile.id),
+                "name": _partner_display_name(mentor_user),
+                "tier": m_profile.pricing_tier,
+            },
+            "mentee": {
+                "id": str(mentee_profile.id) if mentee_profile else None,
+                "name": _partner_display_name(mentee_user) if mentee_user else "Mentee",
+            }
+        })
+
     return filtered

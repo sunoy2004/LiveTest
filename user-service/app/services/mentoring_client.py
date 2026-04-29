@@ -131,3 +131,27 @@ async def get_mentor_user_ids(user_id: uuid.UUID) -> List[str]:
         logger.error("Failed to fetch mentor user_ids: %s", e)
         return []
 
+
+async def get_mentee_user_ids(user_id: uuid.UUID) -> List[str]:
+    """
+    Call Mentoring Service's dedicated endpoint to get the list of
+    mentee user_ids for a user's ACTIVE mentorship connections.
+    """
+    url = f"{MENTORING_SERVICE_URL}/api/v1/mentorships/mentees"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url, params={"user_id": str(user_id)})
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("mentees", [])
+            else:
+                logger.warning(
+                    "Mentoring service /mentorships/mentees returned %d: %s",
+                    response.status_code, response.text,
+                )
+                return []
+    except Exception as e:
+        logger.error("Failed to fetch mentee user_ids: %s", e)
+        return []
+
+

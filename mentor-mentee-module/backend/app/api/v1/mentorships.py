@@ -111,3 +111,42 @@ async def get_active_mentors_for_user(
 
     results = (await db.execute(stmt)).scalars().all()
     return {"mentors": [str(uid) for uid in results]}
+
+
+@router.get("/mentees")
+async def get_active_mentees_for_user(
+    user_id: uuid.UUID = Query(..., description="The mentor user_id to look up"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Return mentee user_ids for a user's ACTIVE mentorship connections.
+
+    Logic:
+      - Find mentor_profiles.id WHERE user_id = :user_id
+      - SELECT mentee_profiles.user_id AS mentee_user_id
+        FROM mentorship_connections mc
+        JOIN mentee_profiles me ON mc.mentee_id = me.id
+        JOIN mentor_profiles mt ON mc.mentor_id = mt.id
+        WHERE mt.user_id = :user_id AND mc.status = 'ACTIVE'
+    """
+    mentor = await db.scalar(
+        select(MentorProfile.id).where(MentorProfile.user_id == user_id)
+    )
+
+    if mentor is None:
+        return {"mentees": []}
+
+    stmt = (
+        select(MenteeProfile.user_id)
+        .select_from(MentorshipConnection)
+        .join(MenteeProfile, MentorshipConnection.mentee_id == MenteeProfile.id)
+        .join(MentorProfile, MentorshipConnection.mentor_id == MentorProfile.id)
+        .where(
+            MentorProfile.user_id == user_id,
+            MentorshipConnection.status == MentorshipConnectionStatus.ACTIVE,
+        )
+    )
+
+    results = (await db.execute(stmt)).scalars().all()
+    return {"mentees": [str(uid) for uid in results]}
+

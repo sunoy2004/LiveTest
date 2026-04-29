@@ -47,10 +47,9 @@ async def dashboard_upcoming_sessions(
 
     Fallback: returns empty list if no mentors or Mentoring Service is unreachable.
     """
-    sessions = await dashboard_service.get_upcoming_sessions_filtered(
+    return await dashboard_service.get_upcoming_sessions_filtered(
         db, user=user, context=context, limit=limit,
     )
-    return {"upcoming_sessions": sessions}
 
 
 

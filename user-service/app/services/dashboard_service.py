@@ -189,14 +189,14 @@ async def _active_connection_ids_for_viewer(
         mp = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
         if not mp:
             return [], None
-        # The service already filtered by user_id via header, but we filter by profile_id to be safe
-        ids = [UUID(str(c["id"])) for c in conns if str(c["mentor_id"]) == str(mp.id)]
+        # The service already filtered by user_id via header, but we verify by user_id to be safe
+        ids = [UUID(str(c["id"])) for c in conns if str(c["mentor_user_id"]) == str(user.id)]
         return ids, mp
     else:
         mep = db.query(MenteeProfile).filter(MenteeProfile.user_id == user.id).first()
         if not mep:
             return [], None
-        ids = [UUID(str(c["id"])) for c in conns if str(c["mentee_id"]) == str(mep.id)]
+        ids = [UUID(str(c["id"])) for c in conns if str(c["mentee_user_id"]) == str(user.id)]
         return ids, None
 
 

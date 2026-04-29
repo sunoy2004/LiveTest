@@ -1,13 +1,13 @@
 import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING
-
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey
+from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.models.base import Base
 
-from app.models.base import Base, UUIDMixin
-from app.models.enums import SessionStatus
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.session_history import SessionHistory
 
 if TYPE_CHECKING:
     from app.models.mentorship_connection import MentorshipConnection
@@ -15,37 +15,39 @@ if TYPE_CHECKING:
     from app.models.time_slot import TimeSlot
 
 
-class Session(Base, UUIDMixin):
+from datetime import datetime, timezone
+from sqlalchemy import DateTime, String
+
+class Session(Base):
     __tablename__ = "sessions"
 
-    # Map the 'id' attribute from UUIDMixin to 'session_id' column
     id: Mapped[uuid.UUID] = mapped_column(
         "session_id",
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
     )
-    connection_id: Mapped[uuid.UUID] = mapped_column(
+    mentor_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("mentorship_connections.connection_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=True,
     )
-    slot_id: Mapped[uuid.UUID] = mapped_column(
+    mentee_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("time_slots.id", ondelete="RESTRICT"),
-        nullable=False,
-        index=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=True,
     )
-    status: Mapped[SessionStatus] = mapped_column(
-        SAEnum(SessionStatus, name="session_status_enum", native_enum=False),
-        nullable=False,
-        default=SessionStatus.SCHEDULED,
-        index=True,
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=lambda: datetime.now(timezone.utc),
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
-    connection: Mapped["MentorshipConnection"] = relationship(lazy="joined")
-    slot: Mapped["TimeSlot"] = relationship(back_populates="sessions", lazy="joined")
+    # Relationships will need to be redefined based on user_ids
+    mentor: Mapped["User"] = relationship("User", foreign_keys=[mentor_user_id])
+    mentee: Mapped["User"] = relationship("User", foreign_keys=[mentee_user_id])
     history: Mapped["SessionHistory | None"] = relationship(back_populates="session", uselist=False)
 

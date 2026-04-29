@@ -33,13 +33,33 @@ _origins_list = [o.strip() for o in _origins.split(",") if o.strip()]
 if os.getenv("ALLOW_ALL_CORS", "true").lower() == "true":
     _origins_list = ["*"]
 
+# If origins is ["*"], we can't use allow_credentials=True.
+# However, if we want to support credentials while being flexible, 
+# we should ideally set allow_origins to specific domains.
+_allow_all = "*" in _origins_list
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins_list,
-    allow_credentials=(_origins_list != ["*"]), # Credentials cannot be used with "*"
+    allow_origins=[] if _allow_all else _origins_list,
+    allow_origin_regex=".*" if _allow_all else None,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from fastapi.responses import JSONResponse
+from fastapi import Request
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "type": type(exc).__name__},
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("Origin", "*"),
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
 
 app.include_router(router)
 

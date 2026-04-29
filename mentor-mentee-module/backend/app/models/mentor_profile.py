@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
-
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from datetime import datetime, timezone
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
@@ -27,16 +27,15 @@ class MentorProfile(Base):
     user_id = synonym("id")
     first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    tier_id: Mapped[str] = mapped_column(
-        String(32),
-        ForeignKey("mentor_tiers.tier_id", ondelete="RESTRICT"),
-        nullable=False,
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expertise: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=True)
+    experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=lambda: datetime.now(timezone.utc),
     )
-    is_accepting_requests: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    expertise_areas: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False)
-    total_hours_mentored: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    tier: Mapped["MentorTier"] = relationship("MentorTier", lazy="joined")
     requests: Mapped[list["MentorshipRequest"]] = relationship(
         back_populates="mentor",
         foreign_keys="MentorshipRequest.mentor_id",

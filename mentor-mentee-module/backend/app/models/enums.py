@@ -15,7 +15,7 @@ class MentorshipRequestStatus(str, enum.Enum):
 
 class MentorshipConnectionStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
-    PAUSED = "PAUSED"
+    PENDING = "PENDING"
     COMPLETED = "COMPLETED"
 
 

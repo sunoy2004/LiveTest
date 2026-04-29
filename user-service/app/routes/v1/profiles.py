@@ -33,7 +33,7 @@ def get_profiles_full(
     return FullProfileResponse(
         user_id=user.id,
         email=user.email,
-        is_admin=user.is_admin,
+        is_admin=(user.role == "ADMIN"),
         mentee_profile=full.mentee_profile,
         mentor_profile=full.mentor_profile,
     )

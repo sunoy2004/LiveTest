@@ -38,7 +38,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             detail="Invalid email or password",
         )
     # Check if admin
-    is_admin = getattr(user, "is_admin", False)
+    is_admin = (user.role == "ADMIN")
     token = auth.create_token(user.user_id, user.email, user.role, is_admin=is_admin)
     return LoginResponse(
         access_token=token

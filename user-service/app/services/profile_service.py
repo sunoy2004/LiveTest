@@ -11,7 +11,7 @@ def build_user_public(_db: Session, *, user: User) -> UserPublic:
     return UserPublic(
         id=user.id,
         email=user.email,
-        is_admin=bool(user.is_admin),
+        is_admin=(user.role == "ADMIN"),
     )
 
 
@@ -25,7 +25,7 @@ def get_full_profile(db: Session, *, user: User) -> FullProfileResponse:
     return FullProfileResponse(
         user_id=user.id,
         email=user.email,
-        is_admin=bool(user.is_admin),
+        is_admin=(user.role == "ADMIN"),
         mentor_profile=mentor_out,
         mentee_profile=mentee_out,
     )

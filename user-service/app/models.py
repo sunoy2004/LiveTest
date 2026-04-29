@@ -13,10 +13,10 @@ class User(Base):
 
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     id = synonym("user_id")
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
-    role = Column(String(32), nullable=False, default="MENTEE")  # MENTOR, MENTEE, BOTH
-    is_admin = Column(Boolean, default=False, nullable=False)
+    email = Column(Text, unique=True, nullable=False, index=True)
+    password_hash = Column(Text, nullable=False)
+    role = Column(String(32), nullable=False, default="MENTEE")  # MENTOR, MENTEE, BOTH, ADMIN
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     admin_profile = relationship(
         "AdminProfile",
@@ -67,16 +67,13 @@ class MenteeProfile(Base):
         primary_key=True,
         nullable=False,
         index=True,
-    )
     id = synonym("user_id")
+    first_name = Column(String(128), nullable=True)
+    last_name = Column(String(128), nullable=True)
 
-    learning_goals = Column(ARRAY(String), nullable=True)
+    learning_goals = Column(ARRAY(Text), nullable=True)
     education_level = Column(String(128), nullable=True)
-
-    is_minor = Column(Boolean, default=False, nullable=False)
-    guardian_consent_status = Column(String(32), default="NOT_REQUIRED", nullable=False)
-
-    cached_credit_score = Column(Integer, default=100, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="mentee_profile")
     mentorship_requests = relationship(
@@ -97,24 +94,13 @@ class MentorProfile(Base):
         index=True,
     )
     id = synonym("user_id")
+    first_name = Column(String(128), nullable=True)
+    last_name = Column(String(128), nullable=True)
 
-    tier_id = Column(String(32), ForeignKey("mentor_tiers.tier_id", ondelete="RESTRICT"), nullable=False)
-    # Admin band (TIER_1 | TIER_2 | TIER_3) — row in mentor_tiers with same tier_id supplies default price.
-    pricing_tier = Column(String(16), nullable=False, default="TIER_2")
-    # When set, used as session price instead of tier table (admin-controlled).
-    base_credit_override = Column(Integer, nullable=True)
-    is_accepting_requests = Column(Boolean, default=True, nullable=False)
-
-    expertise_areas = Column(ARRAY(String), nullable=True)
-    total_hours_mentored = Column(Integer, default=0, nullable=False)
-
-    # Rich profile fields (optional; used for viewing + AI similarity)
-    headline = Column(String(256), nullable=True)
     bio = Column(Text, nullable=True)
-    current_title = Column(String(128), nullable=True)
-    current_company = Column(String(128), nullable=True)
-    years_experience = Column(Integer, nullable=True)
-    professional_experiences = Column(JSON, nullable=True)
+    expertise = Column(ARRAY(Text), nullable=True)
+    experience_years = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="mentor_profile")
     tier = relationship("MentorTier", lazy="joined")
@@ -128,23 +114,20 @@ class MentorProfile(Base):
 class MentorshipRequest(Base):
     __tablename__ = "mentorship_requests"
 
-    id = Column("request_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mentee_id = Column(
-        "mentee_user_id",
+class MentorshipRequest(Base):
+    __tablename__ = "mentorship_requests"
+
+    sender_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentee_profiles.user_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
     )
-    mentor_id = Column(
-        "mentor_user_id",
+    receiver_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
     )
-    status = Column(String(32), nullable=False, default="PENDING")
-    intro_message = Column(Text, nullable=False, default="")
+    status = Column(String(32), nullable=True, default="PENDING")
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -158,167 +141,143 @@ class MentorshipRequest(Base):
 class MentorshipConnection(Base):
     __tablename__ = "mentorship_connections"
 
-    id = Column("connection_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mentee_id = Column(
-        "mentee_user_id",
+    mentor_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentee_profiles.user_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
     )
-    mentor_id = Column(
-        "mentor_user_id",
+    mentee_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
     )
     status = Column(String(32), nullable=False, default="ACTIVE")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class TimeSlot(Base):
     __tablename__ = "time_slots"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mentor_id = Column(
-        "mentor_user_id",
+    id = Column("slot_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    mentor_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=False)
     is_booked = Column(Boolean, default=False, nullable=False)
-    cost_credits = Column(Integer, nullable=False, default=5)
-    pending_request_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
 
 class Session(Base):
     __tablename__ = "sessions"
 
     id = Column("session_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    connection_id = Column(
+    mentor_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentorship_connections.connection_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    mentor_id = Column(
-        "mentor_user_id",
-        UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.user_id", ondelete="SET NULL"),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
-    mentee_id = Column(
-        "mentee_user_id",
+    mentee_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentee_profiles.user_id", ondelete="SET NULL"),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
-    slot_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("time_slots.id", ondelete="SET NULL"),
+    start_time = Column(DateTime(timezone=True), nullable=True)
+    end_time = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(32), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
         nullable=True,
-        index=True,
+        default=lambda: datetime.now(timezone.utc),
     )
-    start_time = Column(DateTime(timezone=True), nullable=False)
-    status = Column(String(32), nullable=False)
-    meeting_url = Column(String(1024), nullable=True)
-    # Credits charged at booking (gamification deduct amount); source of truth for display/refunds.
-    price_charged = Column(Integer, nullable=True)
 
 
 class SessionBookingRequest(Base):
-    """Mentee requests a slot; mentor accept creates Session + credit deduct."""
-
     __tablename__ = "session_booking_requests"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    connection_id = Column(
+    id = Column("request_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    mentor_user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentorship_connections.connection_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    slot_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("time_slots.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    status = Column(String(32), nullable=False, default="PENDING")
-    agreed_cost = Column(Integer, nullable=False)
-    session_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("sessions.session_id", ondelete="SET NULL"),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=True,
-        index=True,
     )
+    mentee_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    requested_time = Column(DateTime(timezone=True), nullable=False)
+    status = Column(String(32), nullable=True, default="PENDING")
     created_at = Column(
         DateTime(timezone=True),
-        nullable=False,
+        nullable=True,
         default=lambda: datetime.now(timezone.utc),
     )
-    resolved_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class Goal(Base):
     __tablename__ = "goals"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    connection_id = Column(
+    user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("mentorship_connections.connection_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
     )
-    title = Column(String(512), nullable=False)
-    status = Column(String(32), nullable=False, default="ACTIVE")
+    goal = Column(Text, primary_key=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
 
 
 class SessionHistory(Base):
-    __tablename__ = "session_history"
+    __tablename__ = "session_histories"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     session_id = Column(
         UUID(as_uuid=True),
         ForeignKey("sessions.session_id", ondelete="CASCADE"),
-        unique=True,
-        nullable=False,
+        primary_key=True,
     )
-    notes_data = Column(JSON, nullable=True)
-    mentor_rating = Column(Integer, nullable=True)
-    mentee_rating = Column(Integer, nullable=True)
+    notes = Column(Text, nullable=True)
+    rating = Column(Integer, nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
 
 
 class ReportDispute(Base):
     __tablename__ = "reports_and_disputes"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    status = Column(String(32), nullable=False, default="OPEN")
-    kind = Column(String(64), nullable=False, default="OTHER")
+    id = Column("report_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    raised_by_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    target_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=True,
+    )
     session_id = Column(
         UUID(as_uuid=True),
         ForeignKey("sessions.session_id", ondelete="SET NULL"),
         nullable=True,
-        index=True,
     )
-    opened_by_user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.user_id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    payload = Column(JSON, nullable=True)
+    reason = Column(Text, nullable=False)
+    status = Column(String(32), nullable=False, default="OPEN")
     created_at = Column(
         DateTime(timezone=True),
-        nullable=False,
+        nullable=True,
         default=lambda: datetime.now(timezone.utc),
     )
-    resolved_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class CreditLedgerEntry(Base):

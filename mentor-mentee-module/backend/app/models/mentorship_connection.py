@@ -1,51 +1,41 @@
 import uuid
 from typing import TYPE_CHECKING
-
-from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.models.base import Base, UUIDMixin
-from app.models.enums import MentorshipConnectionStatus
+from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.mentee_profile import MenteeProfile
     from app.models.mentor_profile import MentorProfile
 
 
-class MentorshipConnection(Base, UUIDMixin):
+from datetime import datetime, timezone
+from sqlalchemy import DateTime, String, Text
+
+class MentorshipConnection(Base):
     __tablename__ = "mentorship_connections"
-    __table_args__ = (
-        UniqueConstraint("mentee_user_id", "mentor_user_id", name="uq_mentorship_connections_mentee_mentor"),
-    )
 
-    # Map the 'id' attribute from UUIDMixin to 'connection_id' column
-    id: Mapped[uuid.UUID] = mapped_column(
-        "connection_id",
+    mentor_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
         primary_key=True,
-        default=uuid.uuid4,
     )
-    mentee_id: Mapped[uuid.UUID] = mapped_column(
-        "mentee_user_id",
+    mentee_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("mentee_profiles.user_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
     )
-    mentor_id: Mapped[uuid.UUID] = mapped_column(
-        "mentor_user_id",
-        UUID(as_uuid=True),
-        ForeignKey("mentor_profiles.user_id", ondelete="CASCADE"),
+    status: Mapped[str] = mapped_column(
+        String(32),
         nullable=False,
-        index=True,
+        default="ACTIVE",
     )
-    status: Mapped[MentorshipConnectionStatus] = mapped_column(
-        SAEnum(MentorshipConnectionStatus, name="mentorship_connection_status_enum", native_enum=False),
-        nullable=False,
-        default=MentorshipConnectionStatus.ACTIVE,
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=lambda: datetime.now(timezone.utc),
     )
 
-    mentee: Mapped["MenteeProfile"] = relationship(back_populates="connections", foreign_keys=[mentee_id])
-    mentor: Mapped["MentorProfile"] = relationship(back_populates="connections", foreign_keys=[mentor_id])
+    mentee: Mapped["MenteeProfile"] = relationship(back_populates="connections", foreign_keys=[mentee_user_id])
+    mentor: Mapped["MentorProfile"] = relationship(back_populates="connections", foreign_keys=[mentor_user_id])

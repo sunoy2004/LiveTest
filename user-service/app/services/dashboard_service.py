@@ -402,7 +402,7 @@ async def get_dashboard_stats(
     context: str | None,
 ) -> dict:
     # ADMIN GLOBAL VIEW
-    if user.is_admin:
+    if user.role == "ADMIN":
         all_conns = await _fetch_admin_all_connections()
         unique_mentors = len(set(str(c["mentor_id"]) for c in all_conns))
         unique_mentees = len(set(str(c["mentee_id"]) for c in all_conns))

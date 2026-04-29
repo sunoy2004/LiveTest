@@ -15,9 +15,9 @@ class User(Base):
     id = synonym("user_id")
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    role: Mapped[str] = mapped_column(String(32), nullable=False)
-    is_admin: Mapped[bool] = mapped_column(default=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False) # MENTOR, MENTEE, BOTH, ADMIN
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
         default=lambda: datetime.now(timezone.utc),
     )

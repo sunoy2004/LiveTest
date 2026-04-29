@@ -18,9 +18,9 @@ def user_has_mentee_profile(db: Session, user_id) -> bool:
 
 
 def user_has_admin_profile(db: Session, user_id) -> bool:
-    """True when ``users.is_admin`` is set (authoritative RBAC flag)."""
-    row = db.query(User.is_admin).filter(User.id == user_id).first()
-    return bool(row and row[0])
+    """True when ``users.role`` is 'ADMIN' (authoritative RBAC flag)."""
+    row = db.query(User.role).filter(User.id == user_id).first()
+    return bool(row and row[0] == "ADMIN")
 
 
 def derived_roles(db: Session, *, user: User) -> tuple[bool, bool]:

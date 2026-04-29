@@ -209,7 +209,7 @@ def list_admin_users(db: Session, *, limit: int) -> list[AdminUserListItem]:
             AdminUserListItem(
                 user_id=u.id,
                 email=u.email,
-                is_admin=bool(u.is_admin),
+                is_admin=(u.role == "ADMIN"),
                 is_mentor=is_m,
                 is_mentee=is_me,
             )
@@ -266,7 +266,7 @@ def set_user_roles(db: Session, user_id: UUID, body: AdminUserRoleUpdate) -> Adm
     return AdminUserListItem(
         user_id=user.id,
         email=user.email,
-        is_admin=bool(user.is_admin),
+        is_admin=(user.role == "ADMIN"),
         is_mentor=is_m,
         is_mentee=is_me,
     )

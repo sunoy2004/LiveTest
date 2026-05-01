@@ -135,11 +135,15 @@ services:
     build: ./mentor-mentee-module/backend
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/mentoring
+      GAMIFICATION_SERVICE_URL: http://gamification-service:8000
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-in-production}
     ports:
       - "8004:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      gamification-service:
+        condition: service_started
     networks:
       - stack
 

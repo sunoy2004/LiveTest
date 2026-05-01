@@ -9,11 +9,12 @@ class LoginRequest(BaseModel):
 
 
 class UserPublic(BaseModel):
-    """Credentials identity from `users` row."""
+    """Credentials identity from `users` row (includes `users.role` for shell / MFE UI)."""
 
     id: UUID
     email: str
     is_admin: bool = False
+    roles: list[str] = []
 
     model_config = {"from_attributes": True}
 

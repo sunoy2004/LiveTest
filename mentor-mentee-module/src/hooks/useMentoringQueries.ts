@@ -90,18 +90,30 @@ export function useMentoringQueryInvalidation() {
   };
 }
 
-/** Merge live profile with optional static fallback for dev. */
+/**
+ * Merge live GET /profiles/me with dev fallback only when mentoring API is not configured.
+ * When the API is live, never inject fallback `mentee` — mentor-only users omit `mentee_profile`
+ * and the old merge made the SPA think everyone had a mentee row (mentee UI).
+ */
 export function resolveProfile(
   data: MentoringProfileMeResponse | undefined,
   fallback: MentoringProfileMeResponse,
 ): MentoringProfileMeResponse {
   if (!data) return fallback;
+  if (!isMentoringApiConfigured()) {
+    return {
+      is_admin: data.is_admin ?? false,
+      mentee_profile: data.mentee_profile ?? fallback.mentee_profile,
+      mentor_profile: data.mentor_profile ?? fallback.mentor_profile,
+      mentee: data.mentee_profile ?? fallback.mentee_profile,
+      mentor: data.mentor_profile ?? fallback.mentor_profile,
+    };
+  }
   return {
-    is_admin: data.is_admin,
-    mentee_profile: data.mentee_profile ?? fallback.mentee_profile,
-    mentor_profile: data.mentor_profile ?? fallback.mentor_profile,
-    // Support legacy keys if components still use them
-    mentee: data.mentee_profile ?? fallback.mentee_profile,
-    mentor: data.mentor_profile ?? fallback.mentor_profile,
+    is_admin: data.is_admin ?? false,
+    mentee_profile: data.mentee_profile ?? data.mentee ?? undefined,
+    mentor_profile: data.mentor_profile ?? data.mentor ?? undefined,
+    mentee: data.mentee_profile ?? data.mentee ?? undefined,
+    mentor: data.mentor_profile ?? data.mentor ?? undefined,
   };
 }

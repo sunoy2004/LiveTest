@@ -8,9 +8,10 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    Goal,
     MentorshipConnection,
     Session as MentorshipSession,
-    Goal,
+    SessionBookingRequest,
     SessionHistory,
     User,
 )
@@ -174,3 +175,50 @@ class DashboardService:
             "rating": hist.rating,
             "partner_name": from_email(mentor_email) if sess.mentee_user_id == user_id else from_email(mentee_email)
         } for sess, hist, mentor_email, mentee_email in results]
+
+    async def get_session_booking_request_ledger(
+        self,
+        user_id: uuid.UUID,
+        *,
+        limit: int = 100,
+    ) -> list[dict]:
+        """All session booking rows involving this user (mentee or mentor), newest first."""
+        MentorU = aliased(User)
+        MenteeU = aliased(User)
+
+        stmt = (
+            select(SessionBookingRequest, MentorU.email, MenteeU.email)
+            .outerjoin(MentorU, SessionBookingRequest.mentor_user_id == MentorU.user_id)
+            .outerjoin(MenteeU, SessionBookingRequest.mentee_user_id == MenteeU.user_id)
+            .where(
+                or_(
+                    SessionBookingRequest.mentee_user_id == user_id,
+                    SessionBookingRequest.mentor_user_id == user_id,
+                )
+            )
+            .order_by(
+                SessionBookingRequest.created_at.desc().nulls_last(),
+                SessionBookingRequest.requested_time.desc(),
+            )
+            .limit(limit)
+        )
+        rows = (await self._session.execute(stmt)).all()
+        out: list[dict] = []
+        for req, mentor_email, mentee_email in rows:
+            is_mentee = req.mentee_user_id == user_id
+            partner_name = from_email(mentor_email) if is_mentee else from_email(mentee_email)
+            st = req.requested_time
+            ca = req.created_at
+            out.append(
+                {
+                    "request_id": str(req.id),
+                    "status": (req.status or "PENDING").upper(),
+                    "requested_time": st.isoformat() if st else None,
+                    "created_at": ca.isoformat() if ca else None,
+                    "viewer_role": "mentee" if is_mentee else "mentor",
+                    "partner_name": partner_name,
+                    "mentor_user_id": str(req.mentor_user_id) if req.mentor_user_id else None,
+                    "mentee_user_id": str(req.mentee_user_id) if req.mentee_user_id else None,
+                }
+            )
+        return out

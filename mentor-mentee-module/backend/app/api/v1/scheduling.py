@@ -81,6 +81,20 @@ async def add_availability(
     end = datetime.fromisoformat(body["end_time"].replace("Z", "+00:00"))
     return await svc.add_availability(user_id, start, end)
 
+
+@router.patch("/availability/{slot_id}")
+async def update_availability(
+    slot_id: uuid.UUID,
+    body: dict,
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
+    svc: Annotated[SchedulingService, Depends(get_scheduling_service)],
+):
+    """Reschedule an unbooked slot (same `time_slots` row)."""
+    start = datetime.fromisoformat(body["start_time"].replace("Z", "+00:00"))
+    end = datetime.fromisoformat(body["end_time"].replace("Z", "+00:00"))
+    return await svc.update_availability(user_id, slot_id, start, end)
+
+
 @router.delete("/availability/{slot_id}")
 async def delete_availability(
     slot_id: uuid.UUID,

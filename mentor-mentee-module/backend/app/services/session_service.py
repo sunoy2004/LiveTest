@@ -5,11 +5,13 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models import MentorTier
 from app.models import Session as MentorshipSession
 from app.models import SessionBookingRequest
 from app.models import SessionHistory
 from app.models import TimeSlot
 from app.models import User
+from app.services.book_mentor_session_credits import resolve_default_book_session_credits
 from app.utils.connection_token import mentoring_connection_token
 from app.utils.display_name import from_email
 
@@ -55,6 +57,9 @@ class SessionService:
             .order_by(SessionBookingRequest.requested_time.asc())
         )
         rows = (await self._session.execute(stmt)).scalars().all()
+        tier_def = await self._session.get(MentorTier, "PEER")
+        tier_fallback = int(tier_def.session_credit_cost) if tier_def else 0
+        default_booking_credits = await resolve_default_book_session_credits(tier_fallback)
         out: list[dict] = []
         for req in rows:
             mentee_u = await self._session.get(User, req.mentee_user_id) if req.mentee_user_id else None
@@ -79,7 +84,7 @@ class SessionService:
                     "slot_id": slot_id_str,
                     "start_time": req.requested_time.isoformat() if req.requested_time else "",
                     "end_time": end_iso,
-                    "agreed_cost": 0,
+                    "agreed_cost": default_booking_credits,
                     "mentee_name": mentee_name,
                     "status": req.status or "PENDING",
                 }

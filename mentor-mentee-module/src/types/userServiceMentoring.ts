@@ -12,7 +12,7 @@ export type AvailableSlotItem = {
   slot_id: string;
   start_time: string;
   end_time: string;
-  /** Coins charged when booking this slot (from User Service time_slots.cost_credits). */
+  /** Coins charged when booking this slot (mentoring API: default from gamification BOOK_MENTOR_SESSION). */
   cost_credits: number;
   is_booked?: boolean;
   pending_request_id?: string | null;

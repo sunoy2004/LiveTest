@@ -69,3 +69,13 @@ async def dashboard_vault(
     svc: Annotated[DashboardService, Depends(get_dashboard_service)],
 ) -> list[dict]:
     return await svc.get_vault(user_id)
+
+
+@router.get("/session-booking-requests")
+async def dashboard_session_booking_requests(
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
+    svc: Annotated[DashboardService, Depends(get_dashboard_service)],
+    limit: int = Query(100, ge=1, le=200),
+) -> list[dict]:
+    """Ledger of `session_booking_requests` involving the current user."""
+    return await svc.get_session_booking_request_ledger(user_id, limit=limit)

@@ -13,6 +13,7 @@ from app.models import (
     TimeSlot,
     User,
 )
+from app.services.book_mentor_session_credits import resolve_default_book_session_credits
 from app.utils.connection_token import mentoring_connection_token
 from app.utils.display_name import from_email
 
@@ -21,6 +22,12 @@ class SchedulingService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
+    async def _default_booking_credits(self) -> int:
+        """Gamification BOOK_MENTOR_SESSION base, else PEER tier row in mentoring DB."""
+        tier_def = await self._session.get(MentorTier, "PEER")
+        fallback = int(tier_def.session_credit_cost) if tier_def else 0
+        return await resolve_default_book_session_credits(fallback)
+
     async def get_available_slots_for_mentor(self, mentor_user_id: uuid.UUID) -> list[dict]:
         stmt = select(TimeSlot).where(
             TimeSlot.mentor_user_id == mentor_user_id,
@@ -28,12 +35,13 @@ class SchedulingService:
         ).order_by(TimeSlot.start_time.asc())
         
         slots = (await self._session.execute(stmt)).scalars().all()
+        cost = await self._default_booking_credits()
         return [
             {
                 "slot_id": str(s.id),
                 "start_time": s.start_time.isoformat() if s.start_time else None,
                 "end_time": s.end_time.isoformat() if s.end_time else None,
-                "cost_credits": 0,
+                "cost_credits": cost,
             }
             for s in slots
         ]
@@ -44,13 +52,14 @@ class SchedulingService:
         ).order_by(TimeSlot.start_time.asc())
         
         slots = (await self._session.execute(stmt)).scalars().all()
+        cost = await self._default_booking_credits()
         return [
             {
                 "slot_id": str(s.id),
                 "start_time": s.start_time.isoformat() if s.start_time else None,
                 "end_time": s.end_time.isoformat() if s.end_time else None,
                 "is_booked": s.is_booked,
-                "cost_credits": 0,
+                "cost_credits": cost,
             }
             for s in slots
         ]
@@ -80,6 +89,26 @@ class SchedulingService:
         await self._session.commit()
         return {"status": "deleted"}
 
+    async def update_availability(
+        self,
+        user_id: uuid.UUID,
+        slot_id: uuid.UUID,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> dict:
+        slot = await self._session.scalar(
+            select(TimeSlot).where(TimeSlot.id == slot_id, TimeSlot.mentor_user_id == user_id)
+        )
+        if not slot:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Slot not found")
+        if slot.is_booked:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cannot reschedule a booked slot")
+
+        slot.start_time = start_time
+        slot.end_time = end_time
+        await self._session.commit()
+        return {"slot_id": str(slot.id), "status": "updated"}
+
     async def get_connected_mentors(self, mentee_user_id: uuid.UUID) -> list[dict]:
         """Mentors with ACTIVE connection to this mentee (SPA scheduling)."""
         stmt = (
@@ -92,9 +121,8 @@ class SchedulingService:
             )
         )
         rows = (await self._session.execute(stmt)).all()
-        # No mentor_profiles.tier_id in some deployments — use global `mentor_tiers` PEER row.
-        tier_def = await self._session.get(MentorTier, "PEER")
-        default_credit = int(tier_def.session_credit_cost) if tier_def else 0
+        # Default cost: gamification BOOK_MENTOR_SESSION.base_credit_value; PEER tier is fallback only.
+        default_credit = await self._default_booking_credits()
         out: list[dict] = []
         for conn, mp, mentor_user in rows:
             tier_txt = "PEER"

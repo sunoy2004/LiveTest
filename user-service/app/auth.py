@@ -38,10 +38,16 @@ def create_token(
     now = datetime.now(timezone.utc)
     iat = int(now.timestamp())
     exp = iat + ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    if isinstance(role, (list, tuple)):
+        role_list = [str(r) for r in role]
+    elif role is None:
+        role_list = []
+    else:
+        role_list = [str(role)]
     payload: dict[str, Any] = {
         "user_id": str(user_id),
         "email": email,
-        "role": role,
+        "role": role_list,
         "is_admin": is_admin,
         "iat": iat,
         "exp": exp,

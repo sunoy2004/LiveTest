@@ -1,11 +1,13 @@
 import type {
   DashboardStatsResponse,
   GoalItemResponse,
+  SessionBookingLedgerItem,
   UpcomingSessionItemResponse,
   UpcomingSessionResponse,
   VaultItemResponse,
 } from "@/types/dashboard";
 import { getMentoringApiBaseUrl, MENTORING_API_PREFIX } from "@/config/mentoring";
+import { parseJsonListResponse } from "@/lib/api/jsonListResponse";
 
 function dashboardHeaders(token: string): HeadersInit {
   return {
@@ -92,4 +94,15 @@ export async function fetchDashboardStats(
     throw new Error(err || `Dashboard stats failed (${res.status})`);
   }
   return res.json() as Promise<DashboardStatsResponse>;
+}
+
+export async function fetchSessionBookingLedger(
+  token: string,
+  limit = 100,
+): Promise<SessionBookingLedgerItem[]> {
+  const q = new URLSearchParams({ limit: String(limit) });
+  const res = await fetch(`${DASHBOARD_BASE}/session-booking-requests?${q}`, {
+    headers: dashboardHeaders(token),
+  });
+  return parseJsonListResponse<SessionBookingLedgerItem>(res);
 }

@@ -10,27 +10,49 @@ export type RoleUiMode = {
   showRoleToggle: boolean;
 };
 
+function normalizeJwtRoles(roles?: string[] | null): string[] {
+  if (!roles?.length) return [];
+  return roles.map((r) => String(r).trim().toUpperCase()).filter(Boolean);
+}
+
 /**
- * While GET /profile/full is loading. JWT and /me do not carry mentor/mentee flags;
- * roles are determined by mentor_profiles / mentee_profiles rows for this user id.
+ * When mentoring profiles are ambiguous or still loading, prefer JWT `role` from User Service
+ * (`MENTOR` / `MENTEE` / `ADMIN` in `users.role` array).
  */
-export function getRoleUiModeWhileProfileLoading(): RoleUiMode {
-  return { defaultRole: "mentee", showRoleToggle: false };
+export function inferDashboardRoleFromJwt(roles?: string[] | null): "mentor" | "mentee" | null {
+  const r = new Set(normalizeJwtRoles(roles));
+  const hasMentor = r.has("MENTOR");
+  const hasMentee = r.has("MENTEE");
+  if (hasMentor && !hasMentee) return "mentor";
+  if (hasMentee && !hasMentor) return "mentee";
+  if (hasMentor && hasMentee) return "mentor";
+  return null;
+}
+
+/**
+ * While GET /profiles/me is loading. Prefer JWT roles so mentor-only users do not flash mentee UI.
+ */
+export function getRoleUiModeWhileProfileLoading(shellRoles?: string[] | null): RoleUiMode {
+  const fromJwt = inferDashboardRoleFromJwt(shellRoles);
+  return { defaultRole: fromJwt ?? "mentee", showRoleToggle: false };
 }
 
 /**
  * Domain profiles are the source of truth for mentoring UI.
  * - Only mentor profile → mentor dashboard, no toggle
  * - Only mentee profile → mentee dashboard, no toggle
- * - Both → toggle, default mentee
- * - Neither → mentee UI, no toggle
+ * - Both → toggle; default from JWT when possible, else mentee
+ * - Neither → JWT hint, else mentee
  */
 export function getRoleUiModeFromProfiles(
   mentor: UserServiceMentorProfile | null | undefined,
   mentee: UserServiceMenteeProfile | null | undefined,
+  shellRoles?: string[] | null,
 ): RoleUiMode {
   const mp = mentor != null;
   const mep = mentee != null;
+  const jwtDefault = inferDashboardRoleFromJwt(shellRoles);
+
   if (mp && !mep) {
     return { defaultRole: "mentor", showRoleToggle: false };
   }
@@ -38,7 +60,7 @@ export function getRoleUiModeFromProfiles(
     return { defaultRole: "mentee", showRoleToggle: false };
   }
   if (mp && mep) {
-    return { defaultRole: "mentee", showRoleToggle: true };
+    return { defaultRole: jwtDefault ?? "mentee", showRoleToggle: true };
   }
-  return { defaultRole: "mentee", showRoleToggle: false };
+  return { defaultRole: jwtDefault ?? "mentee", showRoleToggle: false };
 }

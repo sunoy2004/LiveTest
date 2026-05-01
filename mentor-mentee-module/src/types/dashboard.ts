@@ -46,3 +46,15 @@ export type DashboardStatsResponse = {
   sessions_completed: number;
   active_sessions: number;
 };
+
+/** GET /dashboard/session-booking-requests — mentoring_db.session_booking_requests */
+export type SessionBookingLedgerItem = {
+  request_id: string;
+  status: string;
+  requested_time: string | null;
+  created_at: string | null;
+  viewer_role: "mentee" | "mentor";
+  partner_name: string | null;
+  mentor_user_id: string | null;
+  mentee_user_id: string | null;
+};

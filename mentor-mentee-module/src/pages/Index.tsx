@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, Clock, CheckCircle, Video, Plus, RefreshCw, Trophy } from "lucide-react";
+import { Users, Clock, CheckCircle, Video, Plus, RefreshCw, Trophy, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -16,6 +16,7 @@ import BookingDialog from "@/components/dashboard/BookingDialog";
 import ManageAvailabilityDialog from "@/components/dashboard/ManageAvailabilityDialog";
 import IncomingSessionRequestsPanel from "@/components/dashboard/IncomingSessionRequestsPanel";
 import IncomingMatchmakerRequestsPanel from "@/components/dashboard/IncomingMatchmakerRequestsPanel";
+import SessionBookingHistoryDialog from "@/components/dashboard/SessionBookingHistoryDialog";
 import CreditWalletWidget from "@/components/dashboard/CreditWalletWidget";
 import ConsentBanner from "@/components/dashboard/ConsentBanner";
 import {
@@ -55,6 +56,7 @@ import {
 } from "@/lib/roleMode";
 import { mapGoals, mapUpcomingSessionList, mapVaultSessions } from "@/lib/mapDashboard";
 import { cn } from "@/lib/utils";
+import { rolesFromAccessToken } from "@/lib/jwtPayload";
 import {
   Dialog,
   DialogContent,
@@ -82,15 +84,22 @@ const Index = () => {
     navigate("admin/mentors", { replace: true });
   }, [token, profile?.is_admin, navigate]);
 
+  const shellRoles = useMemo(() => {
+    if (user?.roles?.length) return user.roles;
+    const fromJwt = rolesFromAccessToken(token);
+    return fromJwt.length ? fromJwt : undefined;
+  }, [user?.roles, token]);
+
   const { defaultRole, showRoleToggle } = useMemo(() => {
     if (profile) {
       return getRoleUiModeFromProfiles(
         profile.mentor_profile,
         profile.mentee_profile,
+        shellRoles,
       );
     }
-    return getRoleUiModeWhileProfileLoading();
-  }, [profile]);
+    return getRoleUiModeWhileProfileLoading(shellRoles);
+  }, [profile, shellRoles]);
 
   const [role, setRole] = useState<"mentor" | "mentee">(defaultRole);
 
@@ -137,6 +146,7 @@ const Index = () => {
   const profileData = role === "mentor" ? profile.mentor_profile : profile.mentee_profile;
   const greetingName = profileData?.first_name || user?.email?.split("@")[0] || "there";
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [bookingHistoryOpen, setBookingHistoryOpen] = useState(false);
   const [manageAvailabilityOpen, setManageAvailabilityOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchProfile | null>(null);
@@ -437,18 +447,30 @@ const Index = () => {
           title="Upcoming Session"
           subtitle="Dashboard widget A — next Meet link & timing"
           action={
-            <Button
-              size="sm"
-              className="text-xs gradient-primary border-0 shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/25 transition-shadow"
-              onClick={() => {
-                if (role === "mentor") setManageAvailabilityOpen(true);
-                else setScheduleOpen(true);
-              }}
-              disabled={guardianLocksMentorRequests}
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />{" "}
-              {role === "mentee" ? "Request" : "Update availability"}
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs shrink-0"
+                onClick={() => setBookingHistoryOpen(true)}
+                disabled={!token}
+              >
+                <History className="h-3.5 w-3.5 mr-1" />
+                History
+              </Button>
+              <Button
+                size="sm"
+                className="text-xs gradient-primary border-0 shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/25 transition-shadow shrink-0"
+                onClick={() => {
+                  if (role === "mentor") setManageAvailabilityOpen(true);
+                  else setScheduleOpen(true);
+                }}
+                disabled={guardianLocksMentorRequests}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />{" "}
+                {role === "mentee" ? "Request" : "Update availability"}
+              </Button>
+            </>
           }
         >
           <SessionList
@@ -465,6 +487,11 @@ const Index = () => {
           role={role}
           token={token}
           cachedCreditScore={role === "mentee" ? credits : undefined}
+        />
+        <SessionBookingHistoryDialog
+          open={bookingHistoryOpen}
+          onOpenChange={setBookingHistoryOpen}
+          token={token}
         />
         <ManageAvailabilityDialog
           open={manageAvailabilityOpen}

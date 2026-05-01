@@ -1,4 +1,5 @@
 import { getMentoringApiBaseUrl, MENTORING_API_PREFIX } from "@/config/mentoring";
+import { parseJsonListResponse } from "@/lib/api/jsonListResponse";
 import type {
   AvailableSlotItem,
   BookSessionSimpleResponse,
@@ -26,11 +27,7 @@ export async function fetchConnectedMentors(
   const res = await fetch(mentoringV1("/scheduling/connected-mentors"), {
     headers: headers(token),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || `connected mentors failed (${res.status})`);
-  }
-  return res.json() as Promise<ConnectedMentorItem[]>;
+  return parseJsonListResponse<ConnectedMentorItem>(res);
 }
 
 export async function fetchMentorAvailability(
@@ -41,11 +38,7 @@ export async function fetchMentorAvailability(
   const res = await fetch(`${mentoringV1("/scheduling/availability")}?${q}`, {
     headers: headers(token),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || `availability failed (${res.status})`);
-  }
-  return res.json() as Promise<AvailableSlotItem[]>;
+  return parseJsonListResponse<AvailableSlotItem>(res);
 }
 
 export async function fetchMentorProfileDetail(
@@ -85,11 +78,7 @@ export async function fetchIncomingSessionRequests(
   const res = await fetch(mentoringV1("/sessions/incoming-requests"), {
     headers: headers(token),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || `incoming requests failed (${res.status})`);
-  }
-  return res.json() as Promise<IncomingSessionRequestItem[]>;
+  return parseJsonListResponse<IncomingSessionRequestItem>(res);
 }
 
 export async function acceptSessionRequest(
@@ -128,11 +117,7 @@ export async function fetchMyAvailability(token: string): Promise<AvailableSlotI
   const res = await fetch(mentoringV1("/scheduling/my-availability"), {
     headers: headers(token),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || `my availability failed (${res.status})`);
-  }
-  return res.json() as Promise<AvailableSlotItem[]>;
+  return parseJsonListResponse<AvailableSlotItem>(res);
 }
 
 
@@ -162,5 +147,25 @@ export async function deleteAvailability(token: string, slotId: string): Promise
     const err = await res.text();
     throw new Error(err || `delete availability failed (${res.status})`);
   }
+}
+
+export async function updateAvailability(
+  token: string,
+  slotId: string,
+  body: { start_time: string; end_time: string },
+): Promise<{ slot_id: string; status: string }> {
+  const res = await fetch(
+    `${mentoringV1("/scheduling/availability")}/${encodeURIComponent(slotId)}`,
+    {
+      method: "PATCH",
+      headers: headers(token),
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `update availability failed (${res.status})`);
+  }
+  return res.json() as Promise<{ slot_id: string; status: string }>;
 }
 

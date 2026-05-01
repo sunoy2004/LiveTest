@@ -108,14 +108,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Decode JWT payload
     const token = data.access_token;
-    const payloadBase64 = token.split('.')[1];
-    const decodedPayload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
-    
+    const payloadBase64 = token.split(".")[1];
+    const decodedPayload = JSON.parse(atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/"))) as {
+      user_id?: string;
+      email?: string;
+      is_admin?: boolean;
+      role?: unknown;
+    };
+
+    const rawRole = decodedPayload.role;
+    const roles = Array.isArray(rawRole)
+      ? rawRole.map((r) => String(r))
+      : rawRole != null && rawRole !== ""
+        ? [String(rawRole)]
+        : [];
+
     const newUser: AuthUser = {
-      id: decodedPayload.user_id,
-      email: decodedPayload.email,
-      is_admin: decodedPayload.is_admin,
-      roles: decodedPayload.role
+      id: String(decodedPayload.user_id ?? ""),
+      email: String(decodedPayload.email ?? ""),
+      is_admin: Boolean(decodedPayload.is_admin),
+      roles,
     };
 
     persistAuth(token, newUser);

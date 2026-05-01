@@ -121,8 +121,7 @@ const ScheduleSessionDialog = ({
       .catch((e) => {
         toast({
           title: "Could not load mentors",
-          description: e instanceof Error ? e.message : "Request failed",
-          variant: "destructive",
+          description: e instanceof Error ? e.message.slice(0, 280) : "Request failed",
         });
       })
       .finally(() => setLoadingMentors(false));
@@ -145,8 +144,7 @@ const ScheduleSessionDialog = ({
       .catch((e) => {
         toast({
           title: "Could not load slots",
-          description: e instanceof Error ? e.message : "Request failed",
-          variant: "destructive",
+          description: e instanceof Error ? e.message.slice(0, 280) : "Request failed",
         });
       })
       .finally(() => setLoadingSlots(false));
@@ -155,7 +153,7 @@ const ScheduleSessionDialog = ({
   const partners = role === "mentee" ? partnerOptions.mentee : partnerOptions.mentor;
   const partnerLabel = role === "mentee" ? "Mentor" : "Mentee";
 
-  /** Matches server: resolved mentor price (override or gamification BOOK_MENTOR_SESSION), then slot. */
+  /** Matches server: mentor `session_credit_cost` and slot `cost_credits` (gamification BOOK_MENTOR_SESSION base, with PEER tier fallback). */
   const sessionBookingCost =
     selectedMentor == null
       ? 0
@@ -182,6 +180,7 @@ const ScheduleSessionDialog = ({
       });
       void queryClient.invalidateQueries({ queryKey: ["user-service"] });
       void queryClient.invalidateQueries({ queryKey: ["user-service", "mentoring"] });
+      void queryClient.invalidateQueries({ queryKey: ["mentoring", "dashboard", "session-booking-requests"] });
       void queryClient.invalidateQueries({ queryKey: ["gamification", "wallet"] });
       onOpenChange(false);
     } catch (e) {
@@ -271,17 +270,28 @@ const ScheduleSessionDialog = ({
             </div>
 
             {selectedMentor == null ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {loadingMentors ? "Loading mentors…" : "No connected mentors found."}
-              </p>
+              <div className="text-sm text-muted-foreground text-center py-4 px-1 space-y-1">
+                <p>{loadingMentors ? "Loading mentors…" : "No active mentors to book yet."}</p>
+                {!loadingMentors && (
+                  <p className="text-xs text-muted-foreground/80">
+                    You need at least one <span className="font-mono">ACTIVE</span> row in{" "}
+                    <span className="font-mono">mentorship_connections</span> with this mentee. Ask a mentor to accept
+                    a connection request first.
+                  </p>
+                )}
+              </div>
             ) : loadingSlots ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 Loading slots…
               </p>
             ) : availableSlots.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No open slots for {selectedMentor.mentor_name}.
-              </p>
+              <div className="text-sm text-muted-foreground text-center py-4 px-1 space-y-1">
+                <p>No open time slots for {selectedMentor.mentor_name}.</p>
+                <p className="text-xs text-muted-foreground/80">
+                  Their <span className="font-mono">time_slots</span> may be empty, or every slot is already booked.
+                  They can add availability from the mentor dashboard.
+                </p>
+              </div>
             ) : (
               <>
                 <div className="grid gap-2">

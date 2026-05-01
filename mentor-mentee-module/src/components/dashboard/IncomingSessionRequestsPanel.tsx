@@ -32,7 +32,7 @@ export default function IncomingSessionRequestsPanel({
 }: IncomingSessionRequestsPanelProps) {
   const queryClient = useQueryClient();
   const [detail, setDetail] = useState<IncomingSessionRequestItem | null>(null);
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, error } = useQuery({
     queryKey: ["user-service", "mentoring", "incoming-session-requests", token],
     queryFn: () => fetchIncomingSessionRequests(token!),
     enabled: Boolean(enabled && token),
@@ -49,18 +49,34 @@ export default function IncomingSessionRequestsPanel({
     );
   }
 
+  if (isError) {
+    return (
+      <div className="rounded-lg border border-border bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">Could not load session requests</p>
+        <p className="mt-1 text-xs leading-relaxed">
+          {error instanceof Error ? error.message.slice(0, 280) : "Check the mentoring service and try again."}
+        </p>
+      </div>
+    );
+  }
+
   const rows = data ?? [];
   if (rows.length === 0) {
     return (
-      <p className="text-center py-8 text-sm text-muted-foreground">
-        No pending session requests.
-      </p>
+      <div className="text-center py-8 px-2 text-sm text-muted-foreground space-y-1">
+        <p>No pending session requests.</p>
+        <p className="text-xs text-muted-foreground/80">
+          When <span className="font-mono">session_booking_requests</span> has no <span className="font-mono">PENDING</span>{" "}
+          rows for you as mentor, this stays empty.
+        </p>
+      </div>
     );
   }
 
   const invalidateAfterDecision = () => {
     void queryClient.invalidateQueries({ queryKey: ["user-service", "mentoring"] });
     void queryClient.invalidateQueries({ queryKey: ["user-service", "dashboard"] });
+    void queryClient.invalidateQueries({ queryKey: ["mentoring", "dashboard", "session-booking-requests"] });
   };
 
   const handleReject = (r: IncomingSessionRequestItem) => {

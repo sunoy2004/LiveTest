@@ -5,25 +5,7 @@ from app import auth
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import User
-from app.schemas import (
-    DashboardStatsResponse,
-    FullProfileResponse,
-    GoalItem,
-    LoginRequest,
-    LoginResponse,
-    MeResponse,
-    UpcomingSessionItem,
-    UpcomingSessionResponse,
-    UserPublic,
-    VaultItem,
-)
-from app.services.dashboard_service import (
-    get_dashboard_stats,
-    get_goals,
-    get_upcoming_session,
-    get_upcoming_sessions,
-    get_vault,
-)
+from app.schemas import LoginRequest, LoginResponse, MeResponse
 from app.services.profile_service import build_user_public, get_full_profile
 
 router = APIRouter(tags=["auth"])

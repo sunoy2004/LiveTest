@@ -203,6 +203,7 @@ async def _active_connection_ids_for_viewer(
 async def _collect_upcoming_payloads(
     db: Session,
     *,
+    user: User,
     viewer_is_mentor: bool,
     conn_ids: list[UUID],
     mentor_profile: MentorProfile | None,
@@ -335,6 +336,7 @@ async def get_upcoming_session(
 
     rows = await _collect_upcoming_payloads(
         db,
+        user=user,
         viewer_is_mentor=viewer_is_mentor,
         conn_ids=conn_ids,
         mentor_profile=mp,
@@ -359,6 +361,7 @@ async def get_upcoming_sessions(
     include_rejected = not viewer_is_mentor
     return await _collect_upcoming_payloads(
         db,
+        user=user,
         viewer_is_mentor=viewer_is_mentor,
         conn_ids=conn_ids,
         mentor_profile=mp,

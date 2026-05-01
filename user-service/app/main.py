@@ -1,3 +1,8 @@
+"""
+User Service: login, JWT issuance, and non-domain endpoints (e.g. internal, WebSocket
+if configured). The UI should call the Mentoring Service for all `/api/v1` mentoring
+routes using the same JWT.
+"""
 import os
 from contextlib import asynccontextmanager
 

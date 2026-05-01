@@ -9,11 +9,6 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.session_history import SessionHistory
 
-if TYPE_CHECKING:
-    from app.models.mentorship_connection import MentorshipConnection
-    from app.models.session_history import SessionHistory
-    from app.models.time_slot import TimeSlot
-
 
 from datetime import datetime, timezone
 from sqlalchemy import DateTime, String
@@ -26,11 +21,6 @@ class Session(Base):
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
-    )
-    slot_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("time_slots.slot_id", ondelete="SET NULL"),
-        nullable=True,
     )
     mentor_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -51,7 +41,6 @@ class Session(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    slot: Mapped["TimeSlot | None"] = relationship("TimeSlot", back_populates="sessions")
     mentor: Mapped["User"] = relationship("User", foreign_keys=[mentor_user_id])
     mentee: Mapped["User"] = relationship("User", foreign_keys=[mentee_user_id])
     history: Mapped["SessionHistory | None"] = relationship(back_populates="session", uselist=False)

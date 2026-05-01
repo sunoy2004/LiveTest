@@ -1,11 +1,11 @@
 import uuid
 from typing import TYPE_CHECKING
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, DateTime
+from sqlalchemy import ForeignKey, Integer, Text, DateTime
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
-from app.models.base import Base, UUIDMixin
+from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.mentor_tier import MentorTier
@@ -25,8 +25,7 @@ class MentorProfile(Base):
         index=True,
     )
     user_id = synonym("id")
-    first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    last_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Names come from users.email (synced JWT user); not stored on mentor_profiles per DB schema.
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     expertise: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=True)
     experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)

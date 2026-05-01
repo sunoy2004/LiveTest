@@ -1,3 +1,10 @@
+"""
+Mentoring Service — single source of truth for mentoring domain data (mentoring_db).
+
+Users authenticate with the User Service, which issues a JWT. This service accepts
+the same Bearer token, syncs/upserts the `users` row (see `require_user_id`), and
+serves all `/api/v1/...` reads and writes for profiles, connections, sessions, etc.
+"""
 import logging
 import os
 from contextlib import asynccontextmanager

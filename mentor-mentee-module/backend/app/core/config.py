@@ -14,8 +14,9 @@ class Settings(BaseSettings):
     app_name: str = "Mentoring Service"
     debug: bool = False
 
-    # Env: DATABASE_URL. Unix socket URL requires Cloud Run --add-cloudsql-instances matching this path,
-    # or use a TCP URL (e.g. private IP host:5432).
+    # Env: DATABASE_URL — must use the mentoring domain database name `mentoring` (Cloud SQL).
+    # Unix socket: ...@/mentoring?host=/cloudsql/PROJECT:REGION:INSTANCE
+    # TCP (private IP): postgresql+asyncpg://USER:PASS@HOST:5432/mentoring
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:123456@/mentoring?host=/cloudsql/yanc-website%3Aus-central1%3Amentor-mentee-db",
         validation_alias=AliasChoices("DATABASE_URL", "database_url"),

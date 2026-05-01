@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.publisher import publish_event
+from app.utils.display_name import from_email
 from app.models import (
     MenteeProfile,
     MentorProfile,
@@ -88,8 +89,8 @@ class MentorshipRequestService:
 
     async def get_incoming_requests(self, mentor_user_id: uuid.UUID) -> list[dict]:
         stmt = (
-            select(MentorshipRequest, MenteeProfile.first_name, MenteeProfile.last_name)
-            .join(MenteeProfile, MentorshipRequest.sender_user_id == MenteeProfile.user_id)
+            select(MentorshipRequest, User.email)
+            .join(User, MentorshipRequest.sender_user_id == User.user_id)
             .where(
                 MentorshipRequest.receiver_user_id == mentor_user_id,
                 MentorshipRequest.status == MentorshipRequestStatus.PENDING,
@@ -97,30 +98,30 @@ class MentorshipRequestService:
         )
         results = (await self._session.execute(stmt)).all()
         out = []
-        for req, fn, ln in results:
+        for req, email in results:
             d = {
                 "sender_user_id": str(req.sender_user_id),
                 "receiver_user_id": str(req.receiver_user_id),
                 "status": req.status,
-                "mentee_name": f"{fn or ''} {ln or ''}".strip() or "Mentee",
+                "mentee_name": from_email(email),
             }
             out.append(d)
         return out
 
     async def get_outgoing_requests(self, mentee_user_id: uuid.UUID) -> list[dict]:
         stmt = (
-            select(MentorshipRequest, MentorProfile.first_name, MentorProfile.last_name)
-            .join(MentorProfile, MentorshipRequest.receiver_user_id == MentorProfile.user_id)
+            select(MentorshipRequest, User.email)
+            .join(User, MentorshipRequest.receiver_user_id == User.user_id)
             .where(MentorshipRequest.sender_user_id == mentee_user_id)
         )
         results = (await self._session.execute(stmt)).all()
         out = []
-        for req, fn, ln in results:
+        for req, email in results:
             d = {
                 "sender_user_id": str(req.sender_user_id),
                 "receiver_user_id": str(req.receiver_user_id),
                 "status": req.status,
-                "mentor_name": f"{fn or ''} {ln or ''}".strip() or "Mentor",
+                "mentor_name": from_email(email),
             }
             out.append(d)
         return out
@@ -134,16 +135,12 @@ class MentorshipRequestService:
         return [{"id": str(r.user_id), "goal": r.goal} for r in results]
 
     async def get_active_connections(self, user_id: uuid.UUID) -> list[dict]:
+        MentorUser = aliased(User)
+        MenteeUser = aliased(User)
         stmt = (
-            select(
-                MentorshipConnection,
-                MentorProfile.first_name.label("m_fn"),
-                MentorProfile.last_name.label("m_ln"),
-                MenteeProfile.first_name.label("me_fn"),
-                MenteeProfile.last_name.label("me_ln"),
-            )
-            .join(MentorProfile, MentorshipConnection.mentor_user_id == MentorProfile.user_id)
-            .join(MenteeProfile, MentorshipConnection.mentee_user_id == MenteeProfile.user_id)
+            select(MentorshipConnection, MentorUser.email, MenteeUser.email)
+            .join(MentorUser, MentorshipConnection.mentor_user_id == MentorUser.user_id)
+            .join(MenteeUser, MentorshipConnection.mentee_user_id == MenteeUser.user_id)
             .where(
                 or_(
                     MentorshipConnection.mentor_user_id == user_id,
@@ -154,14 +151,13 @@ class MentorshipRequestService:
         )
         results = (await self._session.execute(stmt)).all()
         out = []
-        for row in results:
-            conn = row[0]
+        for conn, mentor_email, mentee_email in results:
             d = {
                 "mentor_user_id": str(conn.mentor_user_id),
                 "mentee_user_id": str(conn.mentee_user_id),
                 "status": conn.status,
-                "mentor_name": f"{row.m_fn or ''} {row.m_ln or ''}".strip() or "Mentor",
-                "mentee_name": f"{row.me_fn or ''} {row.me_ln or ''}".strip() or "Mentee",
+                "mentor_name": from_email(mentor_email),
+                "mentee_name": from_email(mentee_email),
             }
             out.append(d)
         return out

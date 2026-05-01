@@ -30,6 +30,16 @@ async def dashboard_active_mentorships(
     return {"active_mentorships": count}
 
 
+@router.get("/upcoming-session")
+async def dashboard_upcoming_session(
+    context: str | None = Query(None, regex="^(mentor|mentee)$"),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Single next session (SPA `mentoringPaths.dashboardUpcomingSession` — Architecture §3.3)."""
+    return await dashboard_service.get_upcoming_session(db, user=user, context=context)
+
+
 @router.get("/upcoming-sessions")
 async def dashboard_upcoming_sessions(
     context: str | None = Query(None, regex="^(mentor|mentee)$"),

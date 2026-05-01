@@ -23,8 +23,6 @@ class ProfileService:
 
         profile = MenteeProfile(
             user_id=user_id,
-            first_name=data.first_name,
-            last_name=data.last_name,
             learning_goals=list(data.learning_goals) if data.learning_goals else [],
             education_level=data.education_level,
         )
@@ -52,8 +50,6 @@ class ProfileService:
 
         profile = MentorProfile(
             user_id=user_id,
-            first_name=data.first_name,
-            last_name=data.last_name,
             bio=getattr(data, "bio", None),
             expertise=list(data.expertise_areas) if hasattr(data, "expertise_areas") else [],
             experience_years=getattr(data, "experience_years", 0),

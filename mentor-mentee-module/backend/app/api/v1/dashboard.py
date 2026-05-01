@@ -19,6 +19,16 @@ async def dashboard_stats(
 ) -> dict:
     return await svc.get_stats(user_id)
 
+@router.get("/upcoming-session")
+async def dashboard_upcoming_session(
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
+    svc: Annotated[DashboardService, Depends(get_dashboard_service)],
+) -> dict | None:
+    """One next session — aligns with SPA `GET .../dashboard/upcoming-session`."""
+    rows = await svc.get_upcoming_sessions(user_id, limit=1)
+    return rows[0] if rows else None
+
+
 @router.get("/upcoming-sessions")
 async def dashboard_upcoming_sessions(
     user_id: Annotated[uuid.UUID, Depends(require_user_id)],

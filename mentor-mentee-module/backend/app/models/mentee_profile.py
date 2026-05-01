@@ -2,13 +2,11 @@ import uuid
 from typing import TYPE_CHECKING
 
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, DateTime
+from sqlalchemy import ForeignKey, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
-from app.models.base import Base, UUIDMixin
-from app.models.enums import GuardianConsentStatus
-
+from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.mentorship_connection import MentorshipConnection
     from app.models.mentorship_request import MentorshipRequest
@@ -26,8 +24,7 @@ class MenteeProfile(Base):
         index=True,
     )
     user_id = synonym("id")
-    first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    last_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Names come from users.email; not stored on mentee_profiles per DB schema.
     learning_goals: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=True)
     education_level: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

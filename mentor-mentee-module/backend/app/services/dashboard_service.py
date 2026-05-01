@@ -1,16 +1,17 @@
 import uuid
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import select, func, or_, and_
+from sqlalchemy import select, func, or_
+from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models import (
-    MenteeProfile,
-    MentorProfile,
     MentorshipConnection,
     Session as MentorshipSession,
-    TimeSlot,
     Goal,
-    SessionHistory
+    SessionHistory,
+    User,
 )
+from app.utils.display_name import from_email
 
 class DashboardService:
     def __init__(self, session: AsyncSession) -> None:
@@ -77,20 +78,13 @@ class DashboardService:
         }
 
     async def get_upcoming_sessions(self, user_id: uuid.UUID, limit: int = 5) -> list[dict]:
-        from sqlalchemy.orm import aliased
-        MenteeP = aliased(MenteeProfile)
-        MentorP = aliased(MentorProfile)
+        MentorU = aliased(User)
+        MenteeU = aliased(User)
 
         stmt = (
-            select(
-                MentorshipSession, 
-                MenteeP.first_name.label("mentee_fn"),
-                MenteeP.last_name.label("mentee_ln"),
-                MentorP.first_name.label("mentor_fn"),
-                MentorP.last_name.label("mentor_ln")
-            )
-            .outerjoin(MenteeP, MentorshipSession.mentee_user_id == MenteeP.user_id)
-            .outerjoin(MentorP, MentorshipSession.mentor_user_id == MentorP.user_id)
+            select(MentorshipSession, MentorU.email, MenteeU.email)
+            .outerjoin(MentorU, MentorshipSession.mentor_user_id == MentorU.user_id)
+            .outerjoin(MenteeU, MentorshipSession.mentee_user_id == MenteeU.user_id)
             .where(
                 or_(
                     MentorshipSession.mentee_user_id == user_id,
@@ -106,11 +100,11 @@ class DashboardService:
         rows = (await self._session.execute(stmt)).all()
         
         out = []
-        for s, me_fn, me_ln, mo_fn, mo_ln in rows:
+        for s, mentor_email, mentee_email in rows:
             if s.mentee_user_id == user_id:
-                partner_name = f"{mo_fn or ''} {mo_ln or ''}".strip() or "Mentor"
+                partner_name = from_email(mentor_email)
             else:
-                partner_name = f"{me_fn or ''} {me_ln or ''}".strip() or "Mentee"
+                partner_name = from_email(mentee_email)
 
             out.append({
                 "session_id": str(s.id),
@@ -126,22 +120,14 @@ class DashboardService:
         return [{"id": str(g.user_id), "title": g.goal, "status": "ACTIVE"} for g in goals]
 
     async def get_vault(self, user_id: uuid.UUID) -> list[dict]:
-        from sqlalchemy.orm import aliased
-        MenteeP = aliased(MenteeProfile)
-        MentorP = aliased(MentorProfile)
-        
+        MentorU = aliased(User)
+        MenteeU = aliased(User)
+
         stmt = (
-            select(
-                MentorshipSession, 
-                SessionHistory, 
-                MenteeP.first_name.label("mentee_fn"),
-                MenteeP.last_name.label("mentee_ln"),
-                MentorP.first_name.label("mentor_fn"),
-                MentorP.last_name.label("mentor_ln")
-            )
+            select(MentorshipSession, SessionHistory, MentorU.email, MenteeU.email)
             .join(SessionHistory, SessionHistory.session_id == MentorshipSession.id)
-            .outerjoin(MenteeP, MentorshipSession.mentee_user_id == MenteeP.user_id)
-            .outerjoin(MentorP, MentorshipSession.mentor_user_id == MentorP.user_id)
+            .outerjoin(MentorU, MentorshipSession.mentor_user_id == MentorU.user_id)
+            .outerjoin(MenteeU, MentorshipSession.mentee_user_id == MenteeU.user_id)
             .where(
                 or_(
                     MentorshipSession.mentee_user_id == user_id,
@@ -156,5 +142,5 @@ class DashboardService:
             "start_time": sess.start_time,
             "notes": hist.notes or "",
             "rating": hist.rating,
-            "partner_name": (f"{mo_fn or ''} {mo_ln or ''}".strip() or "Mentor") if sess.mentee_user_id == user_id else (f"{me_fn or ''} {me_ln or ''}".strip() or "Mentee")
-        } for sess, hist, me_fn, me_ln, mo_fn, mo_ln in results]
+            "partner_name": from_email(mentor_email) if sess.mentee_user_id == user_id else from_email(mentee_email)
+        } for sess, hist, mentor_email, mentee_email in results]

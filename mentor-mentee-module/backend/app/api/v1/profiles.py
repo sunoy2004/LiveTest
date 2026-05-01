@@ -13,8 +13,32 @@ from app.schemas.profile import (
 )
 from app.services.profile_service import ProfileService
 from app.models.user import User
+from app.utils.display_name import split_local_parts
 
 router = APIRouter()
+
+
+def _mentee_read(profile, email: str | None) -> MenteeProfileRead:
+    fn, ln = split_local_parts(email)
+    return MenteeProfileRead(
+        user_id=profile.user_id,
+        first_name=fn,
+        last_name=ln,
+        learning_goals=list(profile.learning_goals or []),
+        education_level=profile.education_level,
+    )
+
+
+def _mentor_read(profile, email: str | None) -> MentorProfileRead:
+    fn, ln = split_local_parts(email)
+    return MentorProfileRead(
+        user_id=profile.user_id,
+        first_name=fn,
+        last_name=ln,
+        bio=profile.bio,
+        expertise=list(profile.expertise or []),
+        experience_years=profile.experience_years or 0,
+    )
 
 
 @router.post("/mentee", response_model=MenteeProfileRead, status_code=status.HTTP_201_CREATED)
@@ -23,9 +47,10 @@ async def create_mentee_profile(
     user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     svc: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> MenteeProfileRead:
-    """Create mentee profile. Minors get guardian_consent_status=PENDING (DPDP)."""
+    """Create mentee profile (data lives in mentoring_db; user row synced from JWT)."""
     profile = await svc.create_mentee_profile(user_id, body)
-    return MenteeProfileRead.model_validate(profile)
+    user = await svc._session.get(User, user_id)
+    return _mentee_read(profile, user.email if user else None)
 
 
 @router.post("/mentor", response_model=MentorProfileRead, status_code=status.HTTP_201_CREATED)
@@ -34,9 +59,10 @@ async def create_mentor_profile(
     user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     svc: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> MentorProfileRead:
-    """Register a mentor (same gateway contract as mentee). Tiers must exist in DB."""
+    """Register a mentor."""
     profile = await svc.create_mentor_profile(user_id, body)
-    return MentorProfileRead.model_validate(profile)
+    user = await svc._session.get(User, user_id)
+    return _mentor_read(profile, user.email if user else None)
 
 
 @router.get("/me", response_model=ProfileMeResponse)
@@ -46,8 +72,9 @@ async def get_my_profiles(
 ) -> ProfileMeResponse:
     mentee, mentor = await svc.get_profile_bundle(user_id)
     user = await svc._session.get(User, user_id)
+    email = user.email if user else None
     return ProfileMeResponse(
-        mentee_profile=mentee,
-        mentor_profile=mentor,
+        mentee_profile=_mentee_read(mentee, email) if mentee else None,
+        mentor_profile=_mentor_read(mentor, email) if mentor else None,
         is_admin="ADMIN" in (user.role or []) if user else False
     )

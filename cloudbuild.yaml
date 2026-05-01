@@ -156,7 +156,7 @@ steps:
       - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest'
       - '--region=$_LOCATION'
       - '--platform=managed'
-      # Mounts unix socket used by DATABASE_URL default (postgresql://...@/users_db?host=/cloudsql/…)
+      # Mounts unix socket when DATABASE_URL uses ?host=/cloudsql/… (user-service: users_db; mentoring-service: mentoring).
       - '--add-cloudsql-instances=$_CLOUD_SQL_INSTANCE'
       - '--quiet'
 

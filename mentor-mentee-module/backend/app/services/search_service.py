@@ -51,20 +51,16 @@ class SearchService:
         if user_id is not None:
             stmt = stmt.where(MentorProfile.user_id == user_id)
         elif query:
-            name_match = or_(
-                MentorProfile.first_name.ilike(f"%{query}%"),
-                MentorProfile.last_name.ilike(f"%{query}%")
-            )
             expertise_match = MentorProfile.expertise.any(query)
             email_match = User.email.ilike(f"%{query}%")
-            stmt = stmt.where(or_(name_match, expertise_match, email_match))
+            stmt = stmt.where(or_(expertise_match, email_match))
 
         results = (await self._session.execute(stmt)).all()
         return [
             SearchResult(
                 user_id=m.user_id,
-                first_name=m.first_name or email.split("@")[0].title(),
-                last_name=m.last_name,
+                first_name=email.split("@")[0].replace(".", " ").replace("_", " ").title(),
+                last_name=None,
                 role=SearchRole.mentor,
                 expertise=list(m.expertise or []),
                 tier="PEER", # Default tier for now
@@ -84,20 +80,16 @@ class SearchService:
         if user_id is not None:
             stmt = stmt.where(MenteeProfile.user_id == user_id)
         elif query:
-            name_match = or_(
-                MenteeProfile.first_name.ilike(f"%{query}%"),
-                MenteeProfile.last_name.ilike(f"%{query}%")
-            )
             goals_match = MenteeProfile.learning_goals.any(query)
             email_match = User.email.ilike(f"%{query}%")
-            stmt = stmt.where(or_(name_match, goals_match, email_match))
+            stmt = stmt.where(or_(goals_match, email_match))
 
         results = (await self._session.execute(stmt)).all()
         return [
             SearchResult(
                 user_id=m.user_id,
-                first_name=m.first_name or email.split("@")[0].title(),
-                last_name=m.last_name,
+                first_name=email.split("@")[0].replace(".", " ").replace("_", " ").title(),
+                last_name=None,
                 role=SearchRole.mentee,
                 expertise=list(m.learning_goals or []),
                 tier=None,

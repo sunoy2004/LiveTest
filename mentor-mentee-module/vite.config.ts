@@ -67,11 +67,7 @@ export default defineConfig(({ mode }) => {
         exposes: {
           "./App": "./src/App.tsx",
         },
-        shared: {
-          react: { singleton: true, requiredVersion: false },
-          "react-dom": { singleton: true, requiredVersion: false },
-          "react-router-dom": { singleton: true, requiredVersion: false },
-        },
+        shared: ["react", "react-dom", "react-router-dom"],
       }),
     ],
     resolve: {

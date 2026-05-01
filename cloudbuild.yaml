@@ -129,19 +129,138 @@ steps:
       './gamification-service/admin-ui'
     ]
 
+  # Push images for Cloud Run *before* deploy. (The `images:` block runs only after ALL steps,
+  # so deploying in the same build requires an explicit push here first.)
+  - id: push-rollout-targets
+    name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        # When enabling optional deploys below: append to this list → ai-service gamification-service notification-service
+        # and remove those three entries from `images:` (they must push before deploy, not after all steps).
+        for img in user-service mentoring-service common-ui mentee-ui; do
+          docker push "$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$img:latest"
+        done
+
+  # Cloud Run: new revision from Artifact Registry (parallel after push)
+  - id: deploy-user-service
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    waitFor: ['push-rollout-targets']
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '$_CLOUD_RUN_USER_SERVICE'
+      - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest'
+      - '--region=$_LOCATION'
+      - '--platform=managed'
+      - '--quiet'
+
+  - id: deploy-mentoring-service
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    waitFor: ['push-rollout-targets']
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '$_CLOUD_RUN_MENTORING_SERVICE'
+      - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest'
+      - '--region=$_LOCATION'
+      - '--platform=managed'
+      - '--quiet'
+
+  - id: deploy-common-ui
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    waitFor: ['push-rollout-targets']
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '$_CLOUD_RUN_COMMON_UI'
+      - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest'
+      - '--region=$_LOCATION'
+      - '--platform=managed'
+      - '--quiet'
+
+  - id: deploy-mentee-ui
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    waitFor: ['push-rollout-targets']
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '$_CLOUD_RUN_MENTEE_UI'
+      - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest'
+      - '--region=$_LOCATION'
+      - '--platform=managed'
+      - '--quiet'
+
+  # --- Optional Cloud Run deploy: AI, Gamification, Notification (disabled) ---
+  # Enable: extend `for img in …` in push-rollout-targets with ai-service gamification-service notification-service,
+  # remove those three lines from `images:` below, then uncomment the blocks under this banner.
+  #
+  # - id: deploy-ai-service
+  #   name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   waitFor: ['push-rollout-targets']
+  #   entrypoint: 'gcloud'
+  #   args:
+  #     - 'run'
+  #     - 'deploy'
+  #     - '$_CLOUD_RUN_AI_SERVICE'
+  #     - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest'
+  #     - '--region=$_LOCATION'
+  #     - '--platform=managed'
+  #     - '--quiet'
+  #
+  # - id: deploy-gamification-service
+  #   name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   waitFor: ['push-rollout-targets']
+  #   entrypoint: 'gcloud'
+  #   args:
+  #     - 'run'
+  #     - 'deploy'
+  #     - '$_CLOUD_RUN_GAMIFICATION_SERVICE'
+  #     - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest'
+  #     - '--region=$_LOCATION'
+  #     - '--platform=managed'
+  #     - '--quiet'
+  #
+  # - id: deploy-notification-service
+  #   name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   waitFor: ['push-rollout-targets']
+  #   entrypoint: 'gcloud'
+  #   args:
+  #     - 'run'
+  #     - 'deploy'
+  #     - '$_CLOUD_RUN_NOTIFICATION_SERVICE'
+  #     - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest'
+  #     - '--region=$_LOCATION'
+  #     - '--platform=managed'
+  #     - '--quiet'
+
 images:
-  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest'
+  # When enabling commented deploy steps for ai / gamification / notification: DELETE the next three lines
+  # (those images must be pushed in push-rollout-targets before deploy, same pattern as user-service).
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/ai-service:latest'
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-service:latest'
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/notification-service:latest'
-  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest'
-  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest'
-  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest'
   - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/gamification-admin-ui:latest'
+  # user-service, mentoring-service, common-ui, mentee-ui: pushed in push-rollout-targets (before deploy)
 
 substitutions:
   _LOCATION: us-central1
   _REPO_NAME: mentor-mentee-repo
+  # Cloud Run service names (must match services in your project; override per env if different)
+  _CLOUD_RUN_USER_SERVICE: user-service
+  _CLOUD_RUN_MENTORING_SERVICE: mentoring-service
+  _CLOUD_RUN_COMMON_UI: common-ui
+  _CLOUD_RUN_MENTEE_UI: mentee-ui
+  # Uncomment when enabling optional Cloud Run deploy blocks above:
+  # _CLOUD_RUN_AI_SERVICE: ai-service
+  # _CLOUD_RUN_GAMIFICATION_SERVICE: gamification-service
+  # _CLOUD_RUN_NOTIFICATION_SERVICE: notification-service
   _USER_SERVICE_URL: "https://user-service-1095720168864-1095720168864.us-central1.run.app"
   _MENTORING_URL: "https://mentoring-service-1095720168864-1095720168864.us-central1.run.app"
   _GAMIFICATION_URL: "https://gamification-service-1095720168864-1095720168864.us-central1.run.app"

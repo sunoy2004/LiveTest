@@ -9,6 +9,6 @@ from app.core.config import settings
 def verify_token(token: str) -> dict[str, Any]:
     """Verify JWT token and return payload."""
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.algorithm])
     except Exception as e:
         raise ValueError(f"Invalid or expired token: {str(e)}")

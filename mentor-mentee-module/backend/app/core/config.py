@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,7 +18,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:123456@/mentoring?host=/cloudsql/yanc-website%3Aus-central1%3Amentor-mentee-db"
 
     api_v1_prefix: str = "/api/v1"
-    secret_key: str = "secret"
+    jwt_secret: str = Field("secret", validation_alias="JWT_SECRET")
     algorithm: str = "HS256"
 
     # Comma-separated list of allowed CORS origins for browser clients.

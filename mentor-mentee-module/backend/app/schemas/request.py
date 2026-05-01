@@ -1,35 +1,20 @@
 import uuid
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-from app.models.enums import MentorshipRequestStatus
-
+from pydantic import BaseModel, ConfigDict, Field
 
 class MentorshipRequestCreate(BaseModel):
-    mentor_id: uuid.UUID = Field(..., description="Mentor profile id (mentor_profiles.id)")
-    intro_message: str = Field(..., min_length=1, max_length=8000)
-
+    mentor_id: uuid.UUID = Field(..., alias="mentor_id")
+    intro_message: str | None = None
+    
+    model_config = ConfigDict(populate_by_name=True)
 
 class MentorshipRequestStatusUpdate(BaseModel):
-    status: MentorshipRequestStatus = Field(..., description="ACCEPTED or DECLINED")
-
-    @field_validator("status")
-    @classmethod
-    def not_pending(cls, v: MentorshipRequestStatus) -> MentorshipRequestStatus:
-        if v == MentorshipRequestStatus.PENDING:
-            raise ValueError("Use ACCEPTED or DECLINED")
-        return v
-
+    status: str = Field(..., description="ACCEPTED or DECLINED")
 
 class MentorshipRequestRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    id: uuid.UUID
-    mentee_id: uuid.UUID
-    mentor_id: uuid.UUID
-    mentee_user_id: uuid.UUID | None = None
-    mentor_user_id: uuid.UUID | None = None
-    status: MentorshipRequestStatus
-    intro_message: str
+    sender_user_id: uuid.UUID = Field(..., alias="mentee_user_id")
+    receiver_user_id: uuid.UUID = Field(..., alias="mentor_user_id")
+    status: str
     mentee_name: str | None = None
     mentor_name: str | None = None

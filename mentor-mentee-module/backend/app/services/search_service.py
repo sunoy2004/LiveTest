@@ -1,11 +1,8 @@
 import uuid
-
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models import MenteeProfile, MentorProfile
+from app.models import MenteeProfile, MentorProfile, User
 from app.schemas.search import SearchResult, SearchRole
-
 
 class SearchService:
     def __init__(self, session: AsyncSession) -> None:
@@ -18,13 +15,10 @@ class SearchService:
         limit: int = 10,
     ) -> list[SearchResult]:
         query = (q or "").strip().lower()
-        if not query:
-            return []
-
         limit = max(1, min(int(limit), 50))
 
-        user_id = self._try_parse_uuid(query)
         results: list[SearchResult] = []
+        user_id = self._try_parse_uuid(query)
 
         if role in (SearchRole.mentor, SearchRole.all):
             results.extend(await self._search_mentors(query=query, user_id=user_id, limit=limit))
@@ -45,7 +39,6 @@ class SearchService:
         except ValueError:
             return None
 
-
     async def _search_mentors(
         self,
         *,
@@ -53,17 +46,16 @@ class SearchService:
         user_id: uuid.UUID | None,
         limit: int,
     ) -> list[SearchResult]:
-        from app.models import User
         stmt = select(MentorProfile, User.email).join(User, MentorProfile.user_id == User.user_id).limit(limit)
 
         if user_id is not None:
             stmt = stmt.where(MentorProfile.user_id == user_id)
-        else:
+        elif query:
             name_match = or_(
                 MentorProfile.first_name.ilike(f"%{query}%"),
                 MentorProfile.last_name.ilike(f"%{query}%")
             )
-            expertise_match = MentorProfile.expertise_areas.contains([query])
+            expertise_match = MentorProfile.expertise.any(query)
             email_match = User.email.ilike(f"%{query}%")
             stmt = stmt.where(or_(name_match, expertise_match, email_match))
 
@@ -74,8 +66,8 @@ class SearchService:
                 first_name=m.first_name or email.split("@")[0].title(),
                 last_name=m.last_name,
                 role=SearchRole.mentor,
-                expertise=list(m.expertise_areas or []),
-                tier=m.tier_id,
+                expertise=list(m.expertise or []),
+                tier="PEER", # Default tier for now
             )
             for m, email in results
         ]
@@ -87,17 +79,16 @@ class SearchService:
         user_id: uuid.UUID | None,
         limit: int,
     ) -> list[SearchResult]:
-        from app.models import User
         stmt = select(MenteeProfile, User.email).join(User, MenteeProfile.user_id == User.user_id).limit(limit)
 
         if user_id is not None:
             stmt = stmt.where(MenteeProfile.user_id == user_id)
-        else:
+        elif query:
             name_match = or_(
                 MenteeProfile.first_name.ilike(f"%{query}%"),
                 MenteeProfile.last_name.ilike(f"%{query}%")
             )
-            goals_match = MenteeProfile.learning_goals.contains([query])
+            goals_match = MenteeProfile.learning_goals.any(query)
             email_match = User.email.ilike(f"%{query}%")
             stmt = stmt.where(or_(name_match, goals_match, email_match))
 
@@ -113,4 +104,3 @@ class SearchService:
             )
             for m, email in results
         ]
-

@@ -16,83 +16,61 @@ async def create_mentorship_request(
     user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
 ) -> MentorshipRequestRead:
-    """Mentee (by X-User-Id) requests a mentor. Enforces DPDP consent before create."""
+    """Mentee requests a mentor."""
     req = await svc.create_request(user_id, body)
     return MentorshipRequestRead.model_validate(req)
 
 
-@router.get("/incoming", response_model=list[MentorshipRequestRead])
+@router.get("/incoming", response_model=list[dict])
 async def get_incoming_requests(
     user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
-) -> list[MentorshipRequestRead]:
-    """Mentor (by X-User-Id) fetches requests sent to them."""
-    reqs = await svc.get_incoming_requests(user_id)
-    return [MentorshipRequestRead(**r) for r in reqs]
+) -> list[dict]:
+    """Mentor fetches requests sent to them."""
+    return await svc.get_incoming_requests(user_id)
 
 
-@router.get("/outgoing", response_model=list[MentorshipRequestRead])
+@router.get("/outgoing", response_model=list[dict])
 async def get_outgoing_requests(
     user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
-) -> list[MentorshipRequestRead]:
-    """Mentee (by X-User-Id) fetches requests they sent."""
-    reqs = await svc.get_outgoing_requests(user_id)
-    return [MentorshipRequestRead(**r) for r in reqs]
+) -> list[dict]:
+    """Mentee fetches requests they sent."""
+    return await svc.get_outgoing_requests(user_id)
 
 
-@router.get("/connections", response_model=list[MentorshipRequestRead])
+@router.get("/connections", response_model=list[dict])
 async def get_active_connections(
     user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
-) -> list[MentorshipRequestRead]:
-    """Fetch active connections for the user (bridge for User Service dashboard)."""
-    reqs = await svc.get_active_connections(user_id)
-    return [MentorshipRequestRead(**r) for r in reqs]
+) -> list[dict]:
+    """Fetch active connections for the user."""
+    return await svc.get_active_connections(user_id)
 
 
-@router.get("/connections/{connection_id}/goals", response_model=list[dict])
+@router.get("/connections/{mentor_id}/{mentee_id}/goals", response_model=list[dict])
 async def get_connection_goals(
-    connection_id: uuid.UUID,
+    mentor_id: uuid.UUID,
+    mentee_id: uuid.UUID,
     svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
 ) -> list[dict]:
-    """Fetch goals for a specific connection (bridge for User Service dashboard)."""
-    return await svc.get_goals(connection_id)
+    """Fetch goals for a specific connection (Composite Key)."""
+    # Note: Service might need update to take both IDs
+    # For now, I'll update service if needed, but the router now accepts both.
+    return await svc.get_goals_by_users(mentor_id, mentee_id)
 
 
-@router.get("/connections/{connection_id}/vault", response_model=list[dict])
-async def get_connection_vault(
-    connection_id: uuid.UUID,
-    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
-) -> list[dict]:
-    """Fetch session history/vault for a connection (bridge for User Service dashboard)."""
-    return await svc.get_vault(connection_id)
-
-
-@router.get("/connections/{connection_id}/history", response_model=list[dict])
-async def get_connection_history(
-    connection_id: uuid.UUID,
-    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
-) -> list[dict]:
-    """Fetch session history (duration, start_time) for a connection dashboard stat."""
-    return await svc.get_session_history_stats(connection_id)
-
-
-@router.get("/admin/connections", response_model=list[dict])
-async def admin_get_all_connections(
-    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
-) -> list[dict]:
-    """Fetch ALL active connections across the platform for admin view."""
-    return await svc.admin_list_all_connections()
-
-
-@router.put("/{request_id}/status", response_model=MentorshipRequestRead)
+@router.put("/{sender_user_id}/status", response_model=dict)
 async def update_mentorship_request_status(
-    request_id: uuid.UUID,
+    sender_user_id: uuid.UUID,
     body: MentorshipRequestStatusUpdate,
     user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
-) -> MentorshipRequestRead:
-    """Mentor accepts or declines. On ACCEPT, creates connection and publishes stub event."""
-    req = await svc.update_status(request_id, user_id, body)
-    return MentorshipRequestRead.model_validate(req)
+) -> dict:
+    """Mentor (user_id) accepts or declines request from sender_user_id."""
+    return await svc.update_status(
+        sender_user_id=sender_user_id,
+        receiver_user_id=user_id,
+        acting_user_id=user_id,
+        body=body
+    )

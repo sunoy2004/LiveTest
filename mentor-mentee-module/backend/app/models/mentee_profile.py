@@ -37,10 +37,12 @@ class MenteeProfile(Base):
     )
 
     requests: Mapped[list["MentorshipRequest"]] = relationship(
-        back_populates="mentee",
-        foreign_keys="MentorshipRequest.mentee_id",
+        "MentorshipRequest",
+        back_populates="sender",
+        foreign_keys="MentorshipRequest.sender_user_id",
     )
     connections: Mapped[list["MentorshipConnection"]] = relationship(
+        "MentorshipConnection",
         back_populates="mentee",
-        foreign_keys="MentorshipConnection.mentee_id",
+        foreign_keys="MentorshipConnection.mentee_user_id",
     )

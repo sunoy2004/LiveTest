@@ -1,14 +1,11 @@
 import uuid
-
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import MenteeProfile, MentorProfile, MentorTier
-from app.models.enums import GuardianConsentStatus
 from app.schemas.profile import MenteeProfileCreate, MentorProfileCreate
-
 
 class ProfileService:
     def __init__(self, session: AsyncSession) -> None:
@@ -24,18 +21,12 @@ class ProfileService:
                 detail="Mentee profile already exists for this user",
             )
 
-        consent = (
-            GuardianConsentStatus.PENDING if data.is_minor else GuardianConsentStatus.NOT_REQUIRED
-        )
         profile = MenteeProfile(
             user_id=user_id,
             first_name=data.first_name,
             last_name=data.last_name,
-            learning_goals=list(data.learning_goals),
+            learning_goals=list(data.learning_goals) if data.learning_goals else [],
             education_level=data.education_level,
-            is_minor=data.is_minor,
-            guardian_consent_status=consent,
-            cached_credit_score=0,
         )
         self._session.add(profile)
         try:
@@ -59,21 +50,13 @@ class ProfileService:
                 detail="Mentor profile already exists for this user",
             )
 
-        tier = await self._session.get(MentorTier, data.tier_id)
-        if tier is None:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail=f"Unknown tier_id: {data.tier_id}",
-            )
-
         profile = MentorProfile(
             user_id=user_id,
             first_name=data.first_name,
             last_name=data.last_name,
-            tier_id=data.tier_id,
-            is_accepting_requests=data.is_accepting_requests,
-            expertise_areas=list(data.expertise_areas),
-            total_hours_mentored=0,
+            bio=getattr(data, "bio", None),
+            expertise=list(data.expertise_areas) if hasattr(data, "expertise_areas") else [],
+            experience_years=getattr(data, "experience_years", 0),
         )
         self._session.add(profile)
         try:

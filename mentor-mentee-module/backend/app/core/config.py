@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,8 +14,12 @@ class Settings(BaseSettings):
     app_name: str = "Mentoring Service"
     debug: bool = False
 
-    # Env: DATABASE_URL (pydantic-settings default for field database_url)
-    database_url: str = "postgresql+asyncpg://postgres:123456@/mentoring?host=/cloudsql/yanc-website%3Aus-central1%3Amentor-mentee-db"
+    # Env: DATABASE_URL. Unix socket URL requires Cloud Run --add-cloudsql-instances matching this path,
+    # or use a TCP URL (e.g. private IP host:5432).
+    database_url: str = Field(
+        default="postgresql+asyncpg://postgres:123456@/mentoring?host=/cloudsql/yanc-website%3Aus-central1%3Amentor-mentee-db",
+        validation_alias=AliasChoices("DATABASE_URL", "database_url"),
+    )
 
     api_v1_prefix: str = "/api/v1"
     jwt_secret: str = Field("secret", validation_alias="JWT_SECRET")

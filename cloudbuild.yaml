@@ -156,6 +156,8 @@ steps:
       - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/user-service:latest'
       - '--region=$_LOCATION'
       - '--platform=managed'
+      # Mounts unix socket used by DATABASE_URL default (postgresql://...@/users_db?host=/cloudsql/…)
+      - '--add-cloudsql-instances=$_CLOUD_SQL_INSTANCE'
       - '--quiet'
 
   - id: deploy-mentoring-service
@@ -169,6 +171,7 @@ steps:
       - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentoring-service:latest'
       - '--region=$_LOCATION'
       - '--platform=managed'
+      - '--add-cloudsql-instances=$_CLOUD_SQL_INSTANCE'
       - '--quiet'
 
   - id: deploy-common-ui
@@ -182,6 +185,8 @@ steps:
       - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/common-ui:latest'
       - '--region=$_LOCATION'
       - '--platform=managed'
+      # nginx listens on 80 in this image; Cloud Run default probe port is 8080 unless overridden
+      - '--port=80'
       - '--quiet'
 
   - id: deploy-mentee-ui
@@ -195,6 +200,7 @@ steps:
       - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/mentee-ui:latest'
       - '--region=$_LOCATION'
       - '--platform=managed'
+      - '--port=80'
       - '--quiet'
 
   # --- Optional Cloud Run deploy: AI, Gamification, Notification (disabled) ---
@@ -252,6 +258,9 @@ images:
 substitutions:
   _LOCATION: us-central1
   _REPO_NAME: mentor-mentee-repo
+  # Cloud SQL instance connection name PROJECT:REGION:INSTANCE (unix socket mount for default DATABASE_URL in repo).
+  # Omit from deploy (and use TCP DATABASE_URL) only if you do not use Cloud SQL for these services.
+  _CLOUD_SQL_INSTANCE: 'yanc-website:us-central1:mentor-mentee-db'
   # Cloud Run service names (must match services in your project; override per env if different)
   _CLOUD_RUN_USER_SERVICE: user-service
   _CLOUD_RUN_MENTORING_SERVICE: mentoring-service

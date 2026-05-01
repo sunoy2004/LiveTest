@@ -30,5 +30,5 @@ class TimeSlot(Base):
     is_booked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     mentor: Mapped["User"] = relationship("User", foreign_keys=[mentor_user_id])
-    sessions: Mapped[list["Session"]] = relationship(back_populates="slot")
+    sessions: Mapped[list["Session"]] = relationship("Session", back_populates="slot")
 

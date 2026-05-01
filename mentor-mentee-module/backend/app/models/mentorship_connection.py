@@ -37,5 +37,13 @@ class MentorshipConnection(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    mentee: Mapped["MenteeProfile"] = relationship(back_populates="connections", foreign_keys=[mentee_user_id])
-    mentor: Mapped["MentorProfile"] = relationship(back_populates="connections", foreign_keys=[mentor_user_id])
+    mentee: Mapped["MenteeProfile"] = relationship(
+        back_populates="connections",
+        primaryjoin="MentorshipConnection.mentee_user_id == MenteeProfile.id",
+        foreign_keys=[mentee_user_id],
+    )
+    mentor: Mapped["MentorProfile"] = relationship(
+        back_populates="connections",
+        primaryjoin="MentorshipConnection.mentor_user_id == MentorProfile.id",
+        foreign_keys=[mentor_user_id],
+    )

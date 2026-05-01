@@ -36,13 +36,17 @@ class MenteeProfile(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
+    # sender_user_id FK is to users.user_id, not mentee_profiles — explicit join required
     requests: Mapped[list["MentorshipRequest"]] = relationship(
         "MentorshipRequest",
-        back_populates="sender",
+        primaryjoin="MenteeProfile.id == MentorshipRequest.sender_user_id",
         foreign_keys="MentorshipRequest.sender_user_id",
+        overlaps="sender",
     )
+    # mentee_user_id FK is to users.user_id, not mentee_profiles — explicit join required
     connections: Mapped[list["MentorshipConnection"]] = relationship(
         "MentorshipConnection",
         back_populates="mentee",
+        primaryjoin="MenteeProfile.id == MentorshipConnection.mentee_user_id",
         foreign_keys="MentorshipConnection.mentee_user_id",
     )

@@ -27,6 +27,11 @@ class Session(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+    slot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("time_slots.slot_id", ondelete="SET NULL"),
+        nullable=True,
+    )
     mentor_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.user_id", ondelete="CASCADE"),
@@ -46,7 +51,7 @@ class Session(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    # Relationships will need to be redefined based on user_ids
+    slot: Mapped["TimeSlot | None"] = relationship("TimeSlot", back_populates="sessions")
     mentor: Mapped["User"] = relationship("User", foreign_keys=[mentor_user_id])
     mentee: Mapped["User"] = relationship("User", foreign_keys=[mentee_user_id])
     history: Mapped["SessionHistory | None"] = relationship(back_populates="session", uselist=False)

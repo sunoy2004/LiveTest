@@ -35,17 +35,20 @@ async def require_user_id(
         # Sync User replica
         # Architecture Rule: Mentoring DB keeps a replica of users
         # user_id is the universal identifier
+        raw_role = payload.get("role", [])
+        role_array = raw_role if isinstance(raw_role, list) else [raw_role] if raw_role else []
+
         stmt = insert(User).values(
             user_id=uid,
             email=payload["email"],
-            role=payload["role"],
+            role=role_array,
             is_admin=payload.get("is_admin", False),
             password_hash="[REDACTED]" # Not needed in replica but schema requires it
         ).on_conflict_do_update(
             index_elements=[User.user_id],
             set_={
                 "email": payload["email"],
-                "role": payload["role"],
+                "role": role_array,
                 "is_admin": payload.get("is_admin", False)
             }
         )

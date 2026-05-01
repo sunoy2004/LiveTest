@@ -1,92 +1,96 @@
 from __future__ import annotations
-
 import asyncio
 import logging
-
+from sqlalchemy import text
 from app.ai.factory import get_embedding_provider
 from app.infra.db import get_session_factory
 from app.services import recommendation_cache
-from app.services.graph import graph_store
 from app.services.profile_ingestion import upsert_from_snapshot
-from app.services.snapshot_client import fetch_matchmaking_snapshot
 
 log = logging.getLogger(__name__)
 
-
-def hydrate_graph_only() -> bool:
-    snap = fetch_matchmaking_snapshot()
-    if not snap:
-        return False
-    graph_store.hydrate_from_snapshot(snap)
-    mentees = snap.get("mentees") or []
-    return bool(mentees)
-
-
-async def _bootstrap_pgvector(snap: dict) -> int:
-    prov = get_embedding_provider()
+async def fetch_snapshot_from_local_db() -> dict:
+    """
+    Fetches the profile data directly from the mentoring service tables
+    in the same database.
+    """
     fac = get_session_factory()
     async with fac() as session:
-        n = await upsert_from_snapshot(session, prov, snap)
-        await session.commit()
-    return n
+        # Fetch mentors
+        mentors_res = await session.execute(text(
+            "SELECT user_id, bio, expertise, experience_years FROM mentor_profiles"
+        ))
+        mentors = [
+            {"user_id": str(r[0]), "bio": r[1], "expertise": r[2], "experience_years": r[3]}
+            for r in mentors_res.fetchall()
+        ]
 
+        # Fetch mentees
+        mentees_res = await session.execute(text(
+            "SELECT user_id, learning_goals, education_level FROM mentee_profiles"
+        ))
+        mentees = [
+            {"user_id": str(r[0]), "learning_goals": r[1], "education_level": r[2]}
+            for r in mentees_res.fetchall()
+        ]
 
-async def bootstrap_from_user_service() -> bool:
+        # Fetch connections
+        conns_res = await session.execute(text(
+            "SELECT mentor_user_id, mentee_user_id FROM mentorship_connections WHERE status = 'ACTIVE'"
+        ))
+        connections = [
+            {"mentor_id": str(r[0]), "mentee_id": str(r[1])}
+            for r in conns_res.fetchall()
+        ]
+
+        return {
+            "mentors": mentors,
+            "mentees": mentees,
+            "connections": connections
+        }
+
+async def bootstrap_from_local_db() -> bool:
     """
-    Fetches matchmaking snapshot, hydrates the in-memory graph, and
-    (when engine=pgvector) upserts match_profiles.
-    Returns True when a snapshot was loaded successfully.
+    Directly builds embeddings from local database tables.
     """
-    snap = fetch_matchmaking_snapshot()
-    if not snap:
+    try:
+        snap = await fetch_snapshot_from_local_db()
+        if not snap["mentors"] and not snap["mentees"]:
+            log.warning("No profiles found in local database for bootstrapping")
+            return False
+
+        prov = get_embedding_provider()
+        fac = get_session_factory()
+        async with fac() as session:
+            n = await upsert_from_snapshot(session, prov, snap)
+            await session.commit()
+            log.info("Local bootstrap: match_profiles upserted: %d", n)
+        
+        await recommendation_cache.invalidate_all_recommendation_caches()
+        return True
+    except Exception as e:
+        log.error("Bootstrap from local DB failed: %s", e)
         return False
-    graph_store.hydrate_from_snapshot(snap)
-    from app.infra.settings import get_settings
-
-    if get_settings().recommendation_engine == "pgvector":
-        try:
-            n = await _bootstrap_pgvector(snap)
-            log.info("match_profiles upserted: %d", n)
-        except Exception as e:  # noqa: BLE001
-            log.warning("pgvector bootstrap failed: %s", e)
-    return True
-
 
 async def run_bootstrap_with_retry() -> None:
     for _ in range(60):
-        if await bootstrap_from_user_service():
+        if await bootstrap_from_local_db():
             return
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
 
-
-async def rehydrate_from_user_service() -> bool:
-    return await bootstrap_from_user_service()
-
-
-async def run_full_reindex_from_user_service() -> dict:
-    """
-    Full sync from user-service snapshot: graph hydrate + pgvector upsert + cache flush.
-    Returns a dict suitable for JSON (includes ok flag).
-    """
-    from app.infra.settings import get_settings
-
-    snap = fetch_matchmaking_snapshot()
-    if not snap:
-        return {"ok": False, "detail": "snapshot_unavailable"}
-    graph_store.hydrate_from_snapshot(snap)
-    n_up = 0
-    if get_settings().recommendation_engine == "pgvector":
-        try:
-            n_up = await _bootstrap_pgvector(snap)
-            log.info("reindex: match_profiles upserted: %d", n_up)
-        except Exception as e:  # noqa: BLE001
-            log.exception("reindex: pgvector upsert failed")
-            return {"ok": False, "detail": str(e)}
+async def run_full_reindex_from_local_db() -> dict:
+    snap = await fetch_snapshot_from_local_db()
+    prov = get_embedding_provider()
+    fac = get_session_factory()
+    async with fac() as session:
+        n_up = await upsert_from_snapshot(session, prov, snap)
+        await session.commit()
+    
     n_cache = await recommendation_cache.invalidate_all_recommendation_caches()
     return {
         "ok": True,
-        "mentor_rows_in_snapshot": len(snap.get("mentors") or []),
-        "mentee_rows_in_snapshot": len(snap.get("mentees") or []),
+        "mentor_rows": len(snap["mentors"]),
+        "mentee_rows": len(snap["mentees"]),
         "match_profiles_upserted": n_up,
         "recommendation_cache_keys_deleted": n_cache,
     }

@@ -11,13 +11,14 @@ from app.api.routes import recommendations_router
 from app.api.routes.internal import router as internal_router
 from app.infra.db import get_session_factory
 from app.realtime.redis_listener import start_listener, stop_listener
-from app.services.bootstrap import run_bootstrap_with_retry
+from app.services.bootstrap import describe_database_config, run_bootstrap_with_retry
 
 log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    log.info("AI service embedding store: %s (must be the mentoring DB, same as mentoring-service)", describe_database_config())
     await run_bootstrap_with_retry()
     await start_listener()
     try:

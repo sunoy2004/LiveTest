@@ -31,6 +31,30 @@ def _db_hint() -> str:
         return "DATABASE_URL present (parse failed)"
 
 
+def describe_database_config() -> str:
+    """
+    Same DB URL SQLAlchemy uses (Settings.database_url ← Cloud Run env DATABASE_URL).
+    Safe for logs — database name + host or Cloud SQL socket path.
+    """
+    from urllib.parse import parse_qs
+
+    try:
+        raw = get_settings().database_url.strip()
+        if not raw:
+            return "Settings.database_url is empty"
+        u = urlparse(raw.replace("+asyncpg", "", 1))
+        name = (u.path or "").lstrip("/") or "?"
+        qs = parse_qs(u.query or "")
+        sock = (qs.get("host") or [None])[0]
+        if sock:
+            return f"db={name!r} cloud_sql_socket={sock!r}"
+        host = u.hostname or "?"
+        port = f":{u.port}" if u.port else ""
+        return f"db={name!r} tcp={host}{port}"
+    except Exception as exc:
+        return f"could not parse Settings.database_url ({exc})"
+
+
 async def fetch_snapshot_from_local_db() -> dict:
     """Load mentor/mentee/connection rows from mentoring domain tables (same DB as match_profiles)."""
     fac = get_session_factory()

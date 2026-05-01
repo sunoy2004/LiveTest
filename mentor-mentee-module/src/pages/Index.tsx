@@ -107,12 +107,23 @@ const Index = () => {
     setRole(defaultRole);
   }, [defaultRole]);
 
-  const { data: upcomingListRes } = useQuery({
+  const {
+    data: upcomingListRes,
+    isError: upcomingSessionsError,
+    error: upcomingSessionsErr,
+  } = useQuery({
     queryKey: ["user-service", "dashboard", "upcoming-sessions", token, role],
     queryFn: () => fetchDashboardUpcomingSessions(token!, role, 5),
     enabled: Boolean(token),
     staleTime: 30_000,
   });
+
+  const upcomingSessionsLoadError =
+    upcomingSessionsError && upcomingSessionsErr
+      ? upcomingSessionsErr instanceof Error
+        ? upcomingSessionsErr.message
+        : String(upcomingSessionsErr)
+      : null;
 
   const { data: goalsRes } = useQuery({
     queryKey: ["user-service", "dashboard", "goals", token, role],
@@ -479,6 +490,7 @@ const Index = () => {
             viewerRole={role}
             emptyTitle="No upcoming sessions"
             emptySubtitle="Request or schedule a session to see it here"
+            loadError={upcomingSessionsLoadError}
           />
         </SectionCard>
         <ScheduleSessionDialog

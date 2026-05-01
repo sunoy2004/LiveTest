@@ -21,6 +21,8 @@ interface SessionListProps {
   viewerRole?: "mentor" | "mentee";
   emptyTitle?: string;
   emptySubtitle?: string;
+  /** When the list API failed (e.g. mentoring proxy missing); distinct from “no sessions”. */
+  loadError?: string | null;
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -60,11 +62,27 @@ const SessionList = ({
   viewerRole = "mentee",
   emptyTitle,
   emptySubtitle,
+  loadError,
 }: SessionListProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [upcomingDetail, setUpcomingDetail] = useState<Session | null>(null);
 
   if (sessions.length === 0) {
+    if (loadError?.trim()) {
+      return (
+        <div className="text-center py-10 text-muted-foreground">
+          <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+            <Calendar className="h-5 w-5 text-destructive/70" />
+          </div>
+          <p className="text-sm font-medium text-destructive">Could not load sessions</p>
+          <p className="text-xs mt-2 max-w-full break-words px-1 text-left sm:text-center">{loadError}</p>
+          <p className="text-[11px] mt-3 text-muted-foreground">
+            Dev: ensure Vite proxies <code className="rounded bg-muted px-1">/mentoring-service</code> or set{" "}
+            <code className="rounded bg-muted px-1">VITE_MENTORING_API_BASE_URL</code> to your Mentoring API.
+          </p>
+        </div>
+      );
+    }
     const title =
       emptyTitle ??
       `No sessions ${type === "upcoming" ? "scheduled" : "recorded"}`;

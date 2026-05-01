@@ -2,9 +2,10 @@ import uuid
 from datetime import timedelta
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models import MenteeProfile
 from app.models import MentorTier
 from app.models import Session as MentorshipSession
 from app.models import SessionBookingRequest
@@ -12,6 +13,8 @@ from app.models import SessionHistory
 from app.models import TimeSlot
 from app.models import User
 from app.services.book_mentor_session_credits import resolve_default_book_session_credits
+from app.services.gamification_transactions import deduct_book_mentor_session_credits
+from app.services.upcoming_sessions_merge import list_merged_upcoming_sessions
 from app.utils.connection_token import mentoring_connection_token
 from app.utils.display_name import from_email
 
@@ -21,31 +24,23 @@ class SessionService:
         self._session = session
 
     async def get_upcoming_sessions(self, user_id: uuid.UUID) -> list[dict]:
-        # Sessions now directly link to mentor_user_id and mentee_user_id
-        stmt = (
-            select(MentorshipSession)
-            .where(
-                or_(
-                    MentorshipSession.mentor_user_id == user_id,
-                    MentorshipSession.mentee_user_id == user_id
-                ),
-                MentorshipSession.status == "SCHEDULED"
+        """Scheduled sessions and pending booking requests (same merge as dashboard)."""
+        rows = await list_merged_upcoming_sessions(self._session, user_id, limit=100)
+        out: list[dict] = []
+        for r in rows:
+            sid = r["session_id"]
+            out.append(
+                {
+                    "session_id": sid,
+                    "booking_request_id": r["booking_request_id"],
+                    "start_time": r["start_time"],
+                    "end_time": r["end_time"],
+                    "status": r["status"],
+                    "mentor_user_id": r["mentor_user_id"],
+                    "mentee_user_id": r["mentee_user_id"],
+                }
             )
-            .order_by(MentorshipSession.start_time.asc())
-        )
-        sessions = (await self._session.execute(stmt)).scalars().all()
-        
-        return [
-            {
-                "session_id": str(s.id),
-                "start_time": s.start_time.isoformat() if s.start_time else None,
-                "end_time": s.end_time.isoformat() if s.end_time else None,
-                "status": s.status,
-                "mentor_user_id": str(s.mentor_user_id),
-                "mentee_user_id": str(s.mentee_user_id),
-            }
-            for s in sessions
-        ]
+        return out
 
     async def list_incoming_booking_requests(self, mentor_user_id: uuid.UUID) -> list[dict]:
         stmt = (
@@ -107,6 +102,26 @@ class SessionService:
         if slot and slot.is_booked:
             raise HTTPException(status.HTTP_409_CONFLICT, "Slot is no longer available")
 
+        tier_def = await self._session.get(MentorTier, "PEER")
+        tier_fallback = int(tier_def.session_credit_cost) if tier_def else 0
+        credit_amount = await resolve_default_book_session_credits(tier_fallback)
+        if credit_amount < 1:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Session booking credit amount is not configured",
+            )
+
+        mentee_id = req.mentee_user_id
+        if mentee_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Booking has no mentee")
+
+        idempotency_key = f"mentoring_booking_accept:{request_id}"
+        balance_after = await deduct_book_mentor_session_credits(
+            mentee_user_id=mentee_id,
+            amount=credit_amount,
+            idempotency_key=idempotency_key,
+        )
+
         end_dt = req.requested_time + timedelta(hours=1)
         if slot and slot.end_time:
             end_dt = slot.end_time
@@ -122,6 +137,11 @@ class SessionService:
         req.status = "APPROVED"
         if slot:
             slot.is_booked = True
+
+        profile = await self._session.get(MenteeProfile, mentee_id)
+        if profile is not None:
+            profile.cached_credit_score = balance_after
+
         await self._session.commit()
         await self._session.refresh(new_sess)
         st = new_sess.start_time

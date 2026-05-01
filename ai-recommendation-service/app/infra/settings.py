@@ -10,7 +10,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Same PostgreSQL database name as the mentoring service (`mentoring`); AI owns `match_*` tables only.
+    # Cloud Run: set env DATABASE_URL to the same `mentoring` database as the mentoring service
+    # (AI creates/uses `match_profiles` / `match_interactions` in that database).
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/mentoring",
         validation_alias=AliasChoices("DATABASE_URL", "database_url"),

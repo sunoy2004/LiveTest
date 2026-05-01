@@ -52,7 +52,7 @@ function averageRating(a: number | null | undefined, b: number | null | undefine
 
 function mapDashboardStatus(apiStatus: string | null | undefined): Session["status"] {
   const u = (apiStatus ?? "").toUpperCase();
-  if (u === "PENDING_APPROVAL") return "pending_approval";
+  if (u === "PENDING" || u === "PENDING_APPROVAL") return "pending_approval";
   if (u === "REJECTED") return "rejected";
   if (u === "SCHEDULED") return "upcoming";
   return "upcoming";
@@ -82,24 +82,32 @@ export function mapUpcomingSessions(res: UpcomingSessionResponse): Session[] {
 }
 
 export function mapUpcomingSessionList(items: UpcomingSessionItemResponse[]): Session[] {
-  return items.map((s) => {
-    const { dateLabel, timeLabel, startsInMinutes } = formatSessionWhen(s.start_time);
-    const cost = s.price ?? s.session_credit_cost ?? 0;
-    const id = s.session_id ?? `req:${s.booking_request_id}`;
-    return {
-      id,
-      partnerName: s.partner_name ?? "Partner",
-      partnerAvatar: "",
-      date: dateLabel,
-      time: timeLabel,
-      topic: "Mentoring session",
-      status: mapDashboardStatus(s.status),
-      startsInMinutes,
-      meetingUrl: s.meeting_url ?? undefined,
-      costCredits: cost,
-      startTimeIso: s.start_time,
-    };
-  });
+  return items
+    .filter((s) => {
+      const sid = (s.session_id ?? "").trim();
+      const bid = (s.booking_request_id ?? "").trim();
+      const hasId = Boolean(sid || bid);
+      const hasTime = typeof s.start_time === "string" && s.start_time.trim().length > 0;
+      return hasId && hasTime;
+    })
+    .map((s) => {
+      const { dateLabel, timeLabel, startsInMinutes } = formatSessionWhen(s.start_time);
+      const cost = s.price ?? s.session_credit_cost ?? 0;
+      const id = s.session_id ?? `req:${s.booking_request_id}`;
+      return {
+        id,
+        partnerName: s.partner_name ?? "Partner",
+        partnerAvatar: "",
+        date: dateLabel,
+        time: timeLabel,
+        topic: "Mentoring session",
+        status: mapDashboardStatus(s.status),
+        startsInMinutes,
+        meetingUrl: s.meeting_url ?? undefined,
+        costCredits: cost,
+        startTimeIso: s.start_time,
+      };
+    });
 }
 
 export function mapGoals(items: GoalItemResponse[]): Goal[] {

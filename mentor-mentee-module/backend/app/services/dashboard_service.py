@@ -16,6 +16,7 @@ from app.models import (
     User,
 )
 from app.utils.display_name import from_email
+from app.services.upcoming_sessions_merge import list_merged_upcoming_sessions
 
 
 def _goal_api_item(row: Goal) -> dict:
@@ -75,7 +76,7 @@ class DashboardService:
                     MentorshipSession.mentee_user_id == user_id,
                     MentorshipSession.mentor_user_id == user_id
                 ),
-                MentorshipSession.status == "SCHEDULED"
+                func.upper(func.coalesce(MentorshipSession.status, "")) == "SCHEDULED",
             )
         )
 
@@ -88,40 +89,28 @@ class DashboardService:
         }
 
     async def get_upcoming_sessions(self, user_id: uuid.UUID, limit: int = 5) -> list[dict]:
-        MentorU = aliased(User)
-        MenteeU = aliased(User)
+        """
+        Next sessions for this user: ``SCHEDULED`` rows in ``sessions``, plus ``PENDING``
+        ``session_booking_requests`` (sorted by start time, capped at ``limit``).
 
-        stmt = (
-            select(MentorshipSession, MentorU.email, MenteeU.email)
-            .outerjoin(MentorU, MentorshipSession.mentor_user_id == MentorU.user_id)
-            .outerjoin(MenteeU, MentorshipSession.mentee_user_id == MenteeU.user_id)
-            .where(
-                or_(
-                    MentorshipSession.mentee_user_id == user_id,
-                    MentorshipSession.mentor_user_id == user_id
-                ),
-                MentorshipSession.status == "SCHEDULED",
-                MentorshipSession.start_time > datetime.now(timezone.utc)
-            )
-            .order_by(MentorshipSession.start_time.asc())
-            .limit(limit)
+        Scheduled rows may still appear even if ``start_time`` is in the past (legacy data).
+        """
+        rows = await list_merged_upcoming_sessions(
+            self._session, user_id, limit=limit
         )
-
-        rows = (await self._session.execute(stmt)).all()
-        
-        out = []
-        for s, mentor_email, mentee_email in rows:
-            if s.mentee_user_id == user_id:
-                partner_name = from_email(mentor_email)
-            else:
-                partner_name = from_email(mentee_email)
-
-            out.append({
-                "session_id": str(s.id),
-                "start_time": s.start_time,
-                "status": s.status,
-                "partner_name": partner_name
-            })
+        out: list[dict] = []
+        for row in rows:
+            out.append(
+                {
+                    "session_id": row["session_id"],
+                    "booking_request_id": row["booking_request_id"],
+                    "start_time": row["start_time"],
+                    "meeting_url": row.get("meeting_url"),
+                    "status": row["status"],
+                    "partner_name": row["partner_name"],
+                    "session_credit_cost": row["session_credit_cost"],
+                }
+            )
         return out
 
     async def get_goals(self, user_id: uuid.UUID) -> list[dict]:

@@ -36,6 +36,22 @@ function userServiceProxy(): Record<string, object> {
   };
 }
 
+/** Matches `getMentoringDomainBaseUrl()` fallback `origin/mentoring-service` — wire dev server to real API. */
+function mentoringServiceProxy(): Record<string, object> {
+  const target =
+    process.env.MENTORING_SERVICE_PROXY_TARGET ||
+    process.env.VITE_MENTORING_PROXY_TARGET ||
+    "https://mentoring-service-1095720168864-1095720168864.us-central1.run.app";
+  return {
+    "/mentoring-service": {
+      target,
+      changeOrigin: true,
+      secure: true,
+      rewrite: (p: string) => p.replace(/^\/mentoring-service/, "") || "/",
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const mfePort = Number(env.VITE_MFE_REMOTE_PORT) || 5001;
@@ -49,14 +65,14 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       cors: true,
       hmr: { overlay: false },
-      proxy: userServiceProxy(),
+      proxy: { ...userServiceProxy(), ...mentoringServiceProxy() },
     },
     preview: {
       host: true,
       port: mfePort,
       strictPort: true,
       cors: true,
-      proxy: userServiceProxy(),
+      proxy: { ...userServiceProxy(), ...mentoringServiceProxy() },
     },
     plugins: [
       federationRemoteCors(),

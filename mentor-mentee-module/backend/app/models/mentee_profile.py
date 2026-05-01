@@ -2,7 +2,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from datetime import datetime, timezone
-from sqlalchemy import ForeignKey, String, Text, DateTime
+from sqlalchemy import ForeignKey, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
@@ -27,6 +27,9 @@ class MenteeProfile(Base):
     # Names come from users.email; not stored on mentee_profiles per DB schema.
     learning_goals: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=True)
     education_level: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    cached_credit_score: Mapped[int] = mapped_column(
+        Integer(), nullable=False, server_default="0"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

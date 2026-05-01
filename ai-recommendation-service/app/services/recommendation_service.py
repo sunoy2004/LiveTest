@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.infra.settings import get_settings
 from app.repositories.match_profiles import MatchProfileRepository
 from app.services import recommendation_cache
+from app.services.ensure_match_profile import ensure_mentee_embedding
 from app.services.recommendation_enrichment import enrich_recommendation_rows
 from app.services.snapshot_client import fetch_matchmaking_snapshot
 
@@ -42,6 +43,9 @@ class RecommendationService:
             log.warning("Redis read failed (falling back to DB): %s", e)
 
         ok = await self._repo.source_row_exists_for_mentee(user_id=uid)
+        if not ok:
+            if await ensure_mentee_embedding(self._session, uid):
+                ok = await self._repo.source_row_exists_for_mentee(user_id=uid)
         if not ok:
             raise KeyError(user_id)
 

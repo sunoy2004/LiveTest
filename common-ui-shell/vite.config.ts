@@ -5,6 +5,22 @@ import { defineConfig, loadEnv } from "vite";
 
 const mentorProxyPrefix = "/__mentor_remote__";
 
+/** Same host/path as production nginx `location /mentoring-service/` — must exist in dev or dashboard calls 404. */
+function mentoringServiceProxy(): Record<string, object> {
+  const target =
+    process.env.MENTORING_SERVICE_PROXY_TARGET ||
+    process.env.VITE_MENTORING_PROXY_TARGET ||
+    "https://mentoring-service-1095720168864-1095720168864.us-central1.run.app";
+  return {
+    "/mentoring-service": {
+      target,
+      changeOrigin: true,
+      secure: true,
+      rewrite: (p: string) => p.replace(/^\/mentoring-service/, "") || "/",
+    },
+  };
+}
+
 function mentorRemoteProxy(mfePort: string): Record<string, object> {
   const target = `http://127.0.0.1:${mfePort}`;
   const userServiceTarget = process.env.VITE_USER_SERVICE_PROXY_TARGET || "http://127.0.0.1:8000";
@@ -22,6 +38,7 @@ function mentorRemoteProxy(mfePort: string): Record<string, object> {
       ws: true,
       rewrite: (p: string) => p.replace(/^\/user-service/, "") || "/",
     },
+    ...mentoringServiceProxy(),
   };
 }
 

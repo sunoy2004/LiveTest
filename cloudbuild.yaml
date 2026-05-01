@@ -171,6 +171,8 @@ steps:
       - '--region=$_LOCATION'
       - '--platform=managed'
       - '--add-cloudsql-instances=$_CLOUD_SQL_INSTANCE'
+      # Mentoring calls gamification internal APIs (deduct on session approval); merge without wiping other env.
+      - '--update-env-vars=GAMIFICATION_SERVICE_URL=$_GAMIFICATION_URL'
       - '--quiet'
 
   - id: deploy-common-ui

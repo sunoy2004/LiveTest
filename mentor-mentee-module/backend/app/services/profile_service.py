@@ -9,8 +9,6 @@ from app.schemas.profile import MenteeProfileCreate, MentorProfileCreate
 from app.utils.display_name import from_email
 
 
-_TIER_IDS = frozenset({"PEER", "PROFESSIONAL", "EXPERT"})
-
 class ProfileService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -52,12 +50,8 @@ class ProfileService:
                 detail="Mentor profile already exists for this user",
             )
 
-        raw_tier = (data.tier_id or "PEER").strip().upper()
-        tier_id = raw_tier if raw_tier in _TIER_IDS else "PEER"
-
         profile = MentorProfile(
             user_id=user_id,
-            tier_id=tier_id,
             bio=getattr(data, "bio", None),
             expertise=list(data.expertise_areas) if hasattr(data, "expertise_areas") else [],
             experience_years=getattr(data, "experience_years", 0),
@@ -91,8 +85,8 @@ class ProfileService:
         if mp is None:
             return None
         user = await self._session.get(User, mentor_user_id)
-        raw = (mp.tier_id or "PEER").strip().upper()
-        tier_id = raw if raw in _TIER_IDS else "PEER"
+        # Production DB may omit mentor_profiles.tier_id; UI still expects a tier label.
+        tier_id = "PEER"
         uid = str(mp.user_id)
         return {
             "email": user.email if user else "",

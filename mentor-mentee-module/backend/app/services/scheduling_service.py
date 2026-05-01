@@ -16,8 +16,6 @@ from app.models import (
 from app.utils.connection_token import mentoring_connection_token
 from app.utils.display_name import from_email
 
-_VALID_PRICING_TIERS = frozenset({"PEER", "PROFESSIONAL", "EXPERT"})
-
 
 class SchedulingService:
     def __init__(self, session: AsyncSession) -> None:
@@ -94,12 +92,13 @@ class SchedulingService:
             )
         )
         rows = (await self._session.execute(stmt)).all()
+        # No mentor_profiles.tier_id in some deployments — use global `mentor_tiers` PEER row.
+        tier_def = await self._session.get(MentorTier, "PEER")
+        default_credit = int(tier_def.session_credit_cost) if tier_def else 0
         out: list[dict] = []
         for conn, mp, mentor_user in rows:
-            raw = (mp.tier_id or "PEER").strip().upper()
-            tier_txt = raw if raw in _VALID_PRICING_TIERS else "PEER"
-            tier_def = await self._session.get(MentorTier, tier_txt)
-            credit_cost = int(tier_def.session_credit_cost) if tier_def else 0
+            tier_txt = "PEER"
+            credit_cost = default_credit
             conn_token = mentoring_connection_token(conn.mentor_user_id, conn.mentee_user_id)
             out.append(
                 {

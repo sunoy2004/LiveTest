@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users, Clock, CheckCircle, Video, Plus, RefreshCw, Trophy } from "lucide-react";
@@ -40,6 +40,7 @@ import { toast } from "@/hooks/use-toast";
 import { fetchProfileFull } from "@/api/userService";
 import { fetchGamificationWallet } from "@/api/creditServiceApi";
 import {
+  createDashboardGoal,
   fetchDashboardGoals,
   fetchDashboardStats,
   fetchDashboardUpcomingSessions,
@@ -54,10 +55,19 @@ import {
 } from "@/lib/roleMode";
 import { mapGoals, mapUpcomingSessionList, mapVaultSessions } from "@/lib/mapDashboard";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 const Index = () => {
   const { user, token } = useMentorShellAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   useDashboardWebSocket(token);
   
   const { data: profileRemote, isFetching: profileLoading } = useMentoringProfileMe();
@@ -130,6 +140,28 @@ const Index = () => {
   const [manageAvailabilityOpen, setManageAvailabilityOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchProfile | null>(null);
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false);
+  const [questDraft, setQuestDraft] = useState("");
+
+  const createGoalMutation = useMutation({
+    mutationFn: (title: string) => createDashboardGoal(token!, title),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["user-service", "dashboard", "goals"] });
+      toast({
+        title: "Quest added",
+        description: "Your goal is saved on the mentoring service.",
+      });
+      setGoalDialogOpen(false);
+      setQuestDraft("");
+    },
+    onError: (e: Error) => {
+      toast({
+        title: "Could not add quest",
+        description: e.message.slice(0, 240),
+        variant: "destructive",
+      });
+    },
+  });
 
   const {
     data: aiRecs,
@@ -550,15 +582,70 @@ const Index = () => {
           title="Goals"
           subtitle="Dashboard widget C — connection quests & XP"
           action={
-            <Button size="sm" variant="outline" className="text-xs">
-              <Trophy className="h-3.5 w-3.5 mr-1" /> Add Quest
-            </Button>
+            <>
+              <Dialog open={goalDialogOpen} onOpenChange={setGoalDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Add a quest</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3 py-1">
+                    <Label htmlFor="quest-title" className="text-xs text-muted-foreground">
+                      What do you want to achieve?
+                    </Label>
+                    <Input
+                      id="quest-title"
+                      value={questDraft}
+                      onChange={(ev) => setQuestDraft(ev.target.value)}
+                      placeholder="e.g. Finish FastAPI chapter 5"
+                      maxLength={2000}
+                      disabled={createGoalMutation.isPending}
+                      onKeyDown={(ev) => {
+                        if (ev.key === "Enter" && questDraft.trim() && token && !createGoalMutation.isPending) {
+                          ev.preventDefault();
+                          createGoalMutation.mutate(questDraft);
+                        }
+                      }}
+                    />
+                  </div>
+                  <DialogFooter className="gap-2 sm:gap-0">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      disabled={createGoalMutation.isPending}
+                      onClick={() => setGoalDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={!questDraft.trim() || !token || createGoalMutation.isPending}
+                      onClick={() => createGoalMutation.mutate(questDraft)}
+                    >
+                      {createGoalMutation.isPending ? "Saving…" : "Save quest"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                disabled={!token}
+                title={!token ? "Sign in to add goals" : undefined}
+                onClick={() => {
+                  setGoalDialogOpen(true);
+                  setQuestDraft("");
+                }}
+              >
+                <Trophy className="h-3.5 w-3.5 mr-1" /> Add Quest
+              </Button>
+            </>
           }
         >
           <GoalList
             goals={dashboardGoals}
             emptyTitle="No active goals"
-            emptySubtitle="Goals from your mentorship will show here"
+            emptySubtitle="Add a quest above or sync goals from mentoring"
           />
         </SectionCard>
 

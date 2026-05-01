@@ -1,6 +1,9 @@
 import uuid
 from datetime import datetime, timezone, timedelta
+
+from fastapi import HTTPException, status
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +15,12 @@ from app.models import (
     User,
 )
 from app.utils.display_name import from_email
+
+
+def _goal_api_item(row: Goal) -> dict:
+    gid = uuid.uuid5(uuid.NAMESPACE_URL, f"{row.user_id}:{row.goal}")
+    return {"id": str(gid), "title": row.goal, "status": "ACTIVE"}
+
 
 class DashboardService:
     def __init__(self, session: AsyncSession) -> None:
@@ -117,7 +126,28 @@ class DashboardService:
     async def get_goals(self, user_id: uuid.UUID) -> list[dict]:
         stmt = select(Goal).where(Goal.user_id == user_id)
         goals = (await self._session.execute(stmt)).scalars().all()
-        return [{"id": str(g.user_id), "title": g.goal, "status": "ACTIVE"} for g in goals]
+        return [_goal_api_item(g) for g in goals]
+
+    async def create_goal(self, user_id: uuid.UUID, title: str) -> dict:
+        text = title.strip()
+        if not text:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Goal title is required")
+        if len(text) > 2000:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Goal title is too long")
+
+        row = Goal(user_id=user_id, goal=text)
+        self._session.add(row)
+        try:
+            await self._session.commit()
+            await self._session.refresh(row)
+        except IntegrityError:
+            await self._session.rollback()
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail="You already have a goal with this text",
+            ) from None
+
+        return _goal_api_item(row)
 
     async def get_vault(self, user_id: uuid.UUID) -> list[dict]:
         MentorU = aliased(User)

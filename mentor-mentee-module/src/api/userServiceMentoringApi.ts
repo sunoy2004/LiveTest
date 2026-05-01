@@ -1,4 +1,4 @@
-import { getUserServiceBase } from "@/api/userService";
+import { getMentoringApiBaseUrl, MENTORING_API_PREFIX } from "@/config/mentoring";
 import type {
   AvailableSlotItem,
   BookSessionSimpleResponse,
@@ -6,6 +6,11 @@ import type {
   IncomingSessionRequestItem,
   MentorProfileDetail,
 } from "@/types/userServiceMentoring";
+
+function mentoringV1(path: string): string {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${getMentoringApiBaseUrl()}${MENTORING_API_PREFIX}${p}`;
+}
 
 function headers(token: string): HeadersInit {
   return {
@@ -18,7 +23,7 @@ function headers(token: string): HeadersInit {
 export async function fetchConnectedMentors(
   token: string,
 ): Promise<ConnectedMentorItem[]> {
-  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/connected-mentors`, {
+  const res = await fetch(mentoringV1("/scheduling/connected-mentors"), {
     headers: headers(token),
   });
   if (!res.ok) {
@@ -33,7 +38,7 @@ export async function fetchMentorAvailability(
   mentorId: string,
 ): Promise<AvailableSlotItem[]> {
   const q = new URLSearchParams({ mentor_id: mentorId });
-  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/availability?${q}`, {
+  const res = await fetch(`${mentoringV1("/scheduling/availability")}?${q}`, {
     headers: headers(token),
   });
   if (!res.ok) {
@@ -48,7 +53,7 @@ export async function fetchMentorProfileDetail(
   mentorProfileId: string,
 ): Promise<MentorProfileDetail> {
   const res = await fetch(
-    `${getUserServiceBase()}/api/v1/profiles/mentor/${encodeURIComponent(mentorProfileId)}`,
+    `${mentoringV1("/profiles/mentor")}/${encodeURIComponent(mentorProfileId)}`,
     { headers: headers(token) },
   );
   if (!res.ok) {
@@ -62,7 +67,7 @@ export async function bookSessionSimple(
   token: string,
   body: { connection_id: string; slot_id: string },
 ): Promise<BookSessionSimpleResponse> {
-  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/book`, {
+  const res = await fetch(mentoringV1("/scheduling/book"), {
     method: "POST",
     headers: headers(token),
     body: JSON.stringify(body),
@@ -77,7 +82,7 @@ export async function bookSessionSimple(
 export async function fetchIncomingSessionRequests(
   token: string,
 ): Promise<IncomingSessionRequestItem[]> {
-  const res = await fetch(`${getUserServiceBase()}/api/v1/sessions/incoming-requests`, {
+  const res = await fetch(mentoringV1("/sessions/incoming-requests"), {
     headers: headers(token),
   });
   if (!res.ok) {
@@ -92,7 +97,7 @@ export async function acceptSessionRequest(
   requestId: string,
 ): Promise<{ session_id: string; status: string; meeting_url: string | null; start_time: string }> {
   const res = await fetch(
-    `${getUserServiceBase()}/api/v1/sessions/requests/${encodeURIComponent(requestId)}/accept`,
+    `${mentoringV1("/sessions/requests")}/${encodeURIComponent(requestId)}/accept`,
     { method: "POST", headers: headers(token) },
   );
   if (!res.ok) {
@@ -109,7 +114,7 @@ export async function acceptSessionRequest(
 
 export async function rejectSessionRequest(token: string, requestId: string): Promise<void> {
   const res = await fetch(
-    `${getUserServiceBase()}/api/v1/sessions/requests/${encodeURIComponent(requestId)}/reject`,
+    `${mentoringV1("/sessions/requests")}/${encodeURIComponent(requestId)}/reject`,
     { method: "POST", headers: headers(token) },
   );
   if (!res.ok) {
@@ -120,7 +125,7 @@ export async function rejectSessionRequest(token: string, requestId: string): Pr
 
 
 export async function fetchMyAvailability(token: string): Promise<AvailableSlotItem[]> {
-  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/my-availability`, {
+  const res = await fetch(mentoringV1("/scheduling/my-availability"), {
     headers: headers(token),
   });
   if (!res.ok) {
@@ -135,7 +140,7 @@ export async function addAvailability(
   token: string,
   body: { start_time: string; end_time: string },
 ): Promise<{ slot_id: string; status: string }> {
-  const res = await fetch(`${getUserServiceBase()}/api/v1/scheduling/availability`, {
+  const res = await fetch(mentoringV1("/scheduling/availability"), {
     method: "POST",
     headers: headers(token),
     body: JSON.stringify(body),
@@ -150,7 +155,7 @@ export async function addAvailability(
 
 export async function deleteAvailability(token: string, slotId: string): Promise<void> {
   const res = await fetch(
-    `${getUserServiceBase()}/api/v1/scheduling/availability/${encodeURIComponent(slotId)}`,
+    `${mentoringV1("/scheduling/availability")}/${encodeURIComponent(slotId)}`,
     { method: "DELETE", headers: headers(token) },
   );
   if (!res.ok) {

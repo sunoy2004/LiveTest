@@ -46,6 +46,26 @@ export async function fetchDashboardGoals(
   return res.json() as Promise<GoalItemResponse[]>;
 }
 
+/** POST /api/v1/dashboard/goals — add a personal quest / goal row in mentoring_db.goals */
+export async function createDashboardGoal(
+  token: string,
+  title: string,
+): Promise<GoalItemResponse> {
+  const res = await fetch(`${DASHBOARD_BASE}/goals`, {
+    method: "POST",
+    headers: {
+      ...dashboardHeaders(token),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ title: title.trim() }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `Could not create goal (${res.status})`);
+  }
+  return res.json() as Promise<GoalItemResponse>;
+}
+
 export async function fetchDashboardVault(
   token: string,
   context: "mentor" | "mentee",

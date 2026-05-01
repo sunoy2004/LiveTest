@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_profile_service, require_user_id
 from app.schemas.profile import (
@@ -16,6 +16,19 @@ from app.models.user import User
 from app.utils.display_name import split_local_parts
 
 router = APIRouter()
+
+
+@router.get("/mentor/{mentor_user_id}")
+async def get_mentor_detail(
+    mentor_user_id: uuid.UUID,
+    _viewer: Annotated[uuid.UUID, Depends(require_user_id)],
+    svc: Annotated[ProfileService, Depends(get_profile_service)],
+) -> dict:
+    """Mentor profile for modals; `mentor_user_id` is the mentoring `users.user_id` UUID."""
+    payload = await svc.get_mentor_public_detail(mentor_user_id)
+    if payload is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mentor profile not found")
+    return payload
 
 
 def _mentee_read(profile, email: str | None) -> MenteeProfileRead:

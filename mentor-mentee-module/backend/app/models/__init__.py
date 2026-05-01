@@ -15,6 +15,7 @@ from app.models.time_slot import TimeSlot
 from app.models.session import Session
 from app.models.goal import Goal
 from app.models.session_history import SessionHistory
+from app.models.session_booking_request import SessionBookingRequest
 from app.models.user import User
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "Session",
     "Goal",
     "SessionHistory",
+    "SessionBookingRequest",
     "SessionStatus",
     "GoalStatus",
 ]

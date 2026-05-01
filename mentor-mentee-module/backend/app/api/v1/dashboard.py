@@ -1,11 +1,19 @@
 import uuid
 from typing import Annotated
-from fastapi import APIRouter, Depends, Query
+
+from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel, Field
+
 from app.api.deps import require_user_id, get_db
 from app.services.dashboard_service import DashboardService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
+
+
+class GoalCreateBody(BaseModel):
+    title: str = Field(..., min_length=1, max_length=2000, description="Quest / goal description")
+
 
 async def get_dashboard_service(
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -43,6 +51,17 @@ async def dashboard_goals(
     svc: Annotated[DashboardService, Depends(get_dashboard_service)],
 ) -> list[dict]:
     return await svc.get_goals(user_id)
+
+
+@router.post("/goals", status_code=status.HTTP_201_CREATED)
+async def dashboard_create_goal(
+    body: GoalCreateBody,
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
+    svc: Annotated[DashboardService, Depends(get_dashboard_service)],
+) -> dict:
+    """Create a personal learning goal (quest) for the authenticated user."""
+    return await svc.create_goal(user_id, body.title)
+
 
 @router.get("/vault")
 async def dashboard_vault(

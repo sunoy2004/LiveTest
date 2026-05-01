@@ -5,9 +5,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.routes import recommendations_router
 from app.api.routes.internal import router as internal_router
+from app.infra.db import get_session_factory
 from app.realtime.redis_listener import start_listener, stop_listener
 from app.services.bootstrap import run_bootstrap_with_retry
 
@@ -79,5 +81,16 @@ app.include_router(internal_router)
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+async def health():
+    """Liveness + quick check that embedding rows exist (same DB as mentoring domain)."""
+    out: dict = {"status": "ok"}
+    try:
+        fac = get_session_factory()
+        async with fac() as session:
+            r = await session.execute(text("SELECT COUNT(*) FROM match_profiles"))
+            out["match_profiles_count"] = int(r.scalar_one())
+    except Exception as e:
+        log.warning("health: could not count match_profiles: %s", e)
+        out["match_profiles_count"] = None
+        out["match_profiles_error"] = str(e)[:240]
+    return out

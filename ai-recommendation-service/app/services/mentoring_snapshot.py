@@ -35,6 +35,13 @@ def _safe_columns(sync_conn, table: str) -> set[str]:
         return set()
 
 
+async def _table_names(session: AsyncSession) -> set[str]:
+    def _names(sync_conn) -> set[str]:
+        return set(inspect(sync_conn).get_table_names())
+
+    return await session.run_sync(_names)
+
+
 async def _table_columns(session: AsyncSession) -> tuple[set[str], set[str]]:
     def _probe(sync_conn) -> tuple[set[str], set[str]]:
         return (
@@ -46,19 +53,24 @@ async def _table_columns(session: AsyncSession) -> tuple[set[str], set[str]]:
 
 
 async def build_mentoring_snapshot(session: AsyncSession) -> dict[str, Any]:
+    tables = await _table_names(session)
     mp_cols, me_cols = await _table_columns(session)
     now = datetime.now(timezone.utc).isoformat()
 
-    if not mp_cols or not me_cols:
-        log.warning(
-            "mentoring_snapshot: mentor_profiles or mentee_profiles missing or empty schema "
-            "(mentor_cols=%s mentee_cols=%s)",
-            bool(mp_cols),
-            bool(me_cols),
-        )
+    has_users = "users" in tables
+    has_tier_table = "mentor_tiers" in tables
+    if "mentor_profiles" not in tables:
+        log.warning("mentoring_snapshot: table mentor_profiles not found (wrong DATABASE_URL / DB?)")
+    if "mentee_profiles" not in tables:
+        log.warning("mentoring_snapshot: table mentee_profiles not found (wrong DATABASE_URL / DB?)")
+
+    if not mp_cols:
+        log.warning("mentoring_snapshot: cannot read columns for mentor_profiles")
+    if not me_cols:
+        log.warning("mentoring_snapshot: cannot read columns for mentee_profiles")
 
     mentors: list[dict[str, Any]] = []
-    if mp_cols:
+    if mp_cols and "mentor_profiles" in tables:
         exp_col = (
             "expertise"
             if "expertise" in mp_cols
@@ -73,31 +85,38 @@ async def build_mentoring_snapshot(session: AsyncSession) -> dict[str, Any]:
         if exp_col:
             ey_sql = "mp.experience_years" if has_exp_y else "NULL::integer"
             fn_sql = "mp.full_name" if has_m_fn else "NULL::text"
-            if has_tier:
-                q = text(
-                    f"""
-                    SELECT mp.user_id::text, {bio_sql}, mp.{exp_col}, {ey_sql},
-                           u.email, {fn_sql},
-                           COALESCE(mt.session_credit_cost, peer.session_credit_cost, 0),
-                           COALESCE(mp.tier_id::text, 'PEER')
-                    FROM mentor_profiles mp
-                    INNER JOIN users u ON u.user_id = mp.user_id
+            user_email = "u.email" if has_users else "NULL::text"
+            join_users = (
+                "LEFT JOIN users u ON u.user_id = mp.user_id" if has_users else ""
+            )
+
+            if has_tier_table and has_tier:
+                cost_expr = "COALESCE(mt.session_credit_cost, peer.session_credit_cost, 0)"
+                tier_expr = "COALESCE(mp.tier_id::text, 'PEER')"
+                tier_joins = """
                     LEFT JOIN mentor_tiers peer ON peer.tier_id = 'PEER'
                     LEFT JOIN mentor_tiers mt ON mt.tier_id = mp.tier_id
-                    """
-                )
+                """
+            elif has_tier_table:
+                cost_expr = "COALESCE(peer.session_credit_cost, 0)"
+                tier_expr = "'PEER'::text"
+                tier_joins = "LEFT JOIN mentor_tiers peer ON peer.tier_id = 'PEER'"
             else:
-                q = text(
-                    f"""
-                    SELECT mp.user_id::text, {bio_sql}, mp.{exp_col}, {ey_sql},
-                           u.email, {fn_sql},
-                           COALESCE(peer.session_credit_cost, 0),
-                           'PEER'::text
-                    FROM mentor_profiles mp
-                    INNER JOIN users u ON u.user_id = mp.user_id
-                    LEFT JOIN mentor_tiers peer ON peer.tier_id = 'PEER'
-                    """
-                )
+                cost_expr = "0"
+                tier_expr = "'PEER'::text"
+                tier_joins = ""
+
+            q = text(
+                f"""
+                SELECT mp.user_id::text, {bio_sql}, mp.{exp_col}, {ey_sql},
+                       {user_email}, {fn_sql},
+                       ({cost_expr})::integer,
+                       {tier_expr}
+                FROM mentor_profiles mp
+                {join_users}
+                {tier_joins}
+                """
+            )
             try:
                 res = await session.execute(q)
                 for row in res.fetchall():
@@ -116,22 +135,31 @@ async def build_mentoring_snapshot(session: AsyncSession) -> dict[str, Any]:
                         }
                     )
             except Exception as e:
-                log.warning("mentoring_snapshot mentor query failed: %s", e)
+                log.exception("mentoring_snapshot mentor query failed; trying minimal fallback: %s", e)
+                mentors = await _fallback_mentors_minimal(session, mp_cols, exp_col)
         else:
             log.warning(
                 "mentoring_snapshot: mentor_profiles has no expertise / expertise_areas; skipping mentors"
             )
 
     mentees: list[dict[str, Any]] = []
-    if me_cols and "learning_goals" in me_cols:
+    if (
+        me_cols
+        and "mentee_profiles" in tables
+        and "learning_goals" in me_cols
+    ):
         has_me_fn = "full_name" in me_cols
         edu_sql = "m.education_level" if "education_level" in me_cols else "NULL::text"
         fn_sql = "m.full_name" if has_me_fn else "NULL::text"
+        user_email = "u.email" if has_users else "NULL::text"
+        join_users = (
+            "LEFT JOIN users u ON u.user_id = m.user_id" if has_users else ""
+        )
         q_me = text(
             f"""
-            SELECT m.user_id::text, m.learning_goals, {edu_sql}, u.email, {fn_sql}
+            SELECT m.user_id::text, m.learning_goals, {edu_sql}, {user_email}, {fn_sql}
             FROM mentee_profiles m
-            INNER JOIN users u ON u.user_id = m.user_id
+            {join_users}
             """
         )
         try:
@@ -148,24 +176,35 @@ async def build_mentoring_snapshot(session: AsyncSession) -> dict[str, Any]:
                     }
                 )
         except Exception as e:
-            log.warning("mentoring_snapshot mentee query failed: %s", e)
+            log.exception("mentoring_snapshot mentee query failed: %s", e)
 
     connections: list[dict[str, str]] = []
-    try:
-        con_res = await session.execute(
-            text(
-                """
-                SELECT mentor_user_id::text, mentee_user_id::text
-                FROM mentorship_connections
-                WHERE status = 'ACTIVE'
-                """
+    if "mentorship_connections" in tables:
+        try:
+            con_res = await session.execute(
+                text(
+                    """
+                    SELECT mentor_user_id::text, mentee_user_id::text
+                    FROM mentorship_connections
+                    WHERE status = 'ACTIVE'
+                    """
+                )
             )
-        )
-        connections = [
-            {"mentor_id": str(r[0]), "mentee_id": str(r[1])} for r in con_res.fetchall()
-        ]
-    except Exception as e:
-        log.warning("mentoring_snapshot connections query failed: %s", e)
+            connections = [
+                {"mentor_id": str(r[0]), "mentee_id": str(r[1])}
+                for r in con_res.fetchall()
+            ]
+        except Exception as e:
+            log.warning("mentoring_snapshot connections query failed: %s", e)
+
+    log.info(
+        "mentoring_snapshot: mentors=%d mentees=%d connections=%d (has_users=%s has_tier_table=%s)",
+        len(mentors),
+        len(mentees),
+        len(connections),
+        has_users,
+        has_tier_table,
+    )
 
     return {
         "mentors": mentors,
@@ -173,3 +212,43 @@ async def build_mentoring_snapshot(session: AsyncSession) -> dict[str, Any]:
         "connections": connections,
         "timestamp": now,
     }
+
+
+async def _fallback_mentors_minimal(
+    session: AsyncSession,
+    mp_cols: set[str],
+    exp_col: str,
+) -> list[dict[str, Any]]:
+    """Last resort: no joins so a broken FK or missing tier table cannot zero out mentors."""
+    has_bio = "bio" in mp_cols
+    bio_sql = "mp.bio" if has_bio else "NULL::text"
+    has_exp_y = "experience_years" in mp_cols
+    ey_sql = "mp.experience_years" if has_exp_y else "NULL::integer"
+    q = text(
+        f"""
+        SELECT mp.user_id::text, {bio_sql}, mp.{exp_col}, {ey_sql}
+        FROM mentor_profiles mp
+        """
+    )
+    out: list[dict[str, Any]] = []
+    try:
+        res = await session.execute(q)
+        for row in res.fetchall():
+            uid, bio, tags, exp_y = row
+            tags_list = list(tags) if tags is not None else []
+            out.append(
+                {
+                    "user_id": uid,
+                    "bio": bio,
+                    "expertise": tags_list,
+                    "expertise_areas": tags_list,
+                    "experience_years": exp_y,
+                    "display_name": "",
+                    "tier": "PEER",
+                    "session_credit_cost": 0,
+                }
+            )
+        log.info("mentoring_snapshot: fallback mentor rows=%d", len(out))
+    except Exception as e:
+        log.exception("mentoring_snapshot fallback mentor query failed: %s", e)
+    return out

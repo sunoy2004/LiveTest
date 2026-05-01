@@ -13,6 +13,7 @@ class MentorProfileCreate(BaseModel):
     bio: str | None = None
     expertise_areas: list[str] = Field(default_factory=list, alias="expertise")
     experience_years: int = 0
+    tier_id: str = Field(default="PEER", max_length=32)
     
     model_config = ConfigDict(populate_by_name=True)
 

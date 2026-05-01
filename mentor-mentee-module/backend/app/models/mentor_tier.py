@@ -1,25 +1,21 @@
-import uuid
-from datetime import datetime, timezone
-from sqlalchemy import DateTime, ForeignKey, Text
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+"""Global mentor pricing tiers (`tier_id` PK) — mentors reference via `mentor_profiles.tier_id`."""
+
+from __future__ import annotations
+
+from sqlalchemy import Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
-class MentorTier(Base):
-    """Admin-regulated tier pricing (Architecture: mentor_tiers)."""
 
+class MentorTier(Base):
     __tablename__ = "mentor_tiers"
 
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.user_id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    tier: Mapped[str] = mapped_column(Text, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+    tier_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tier_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    session_credit_cost: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    mentor_profiles: Mapped[list["MentorProfile"]] = relationship(
+        "MentorProfile",
+        back_populates="tier_row",
     )

@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import MenteeProfile, MentorProfile, MentorTier, User
+from app.models import MenteeProfile, MentorProfile, User
 from app.schemas.profile import MenteeProfileCreate, MentorProfileCreate
 from app.utils.display_name import from_email
 
@@ -52,8 +52,12 @@ class ProfileService:
                 detail="Mentor profile already exists for this user",
             )
 
+        raw_tier = (data.tier_id or "PEER").strip().upper()
+        tier_id = raw_tier if raw_tier in _TIER_IDS else "PEER"
+
         profile = MentorProfile(
             user_id=user_id,
+            tier_id=tier_id,
             bio=getattr(data, "bio", None),
             expertise=list(data.expertise_areas) if hasattr(data, "expertise_areas") else [],
             experience_years=getattr(data, "experience_years", 0),
@@ -87,8 +91,7 @@ class ProfileService:
         if mp is None:
             return None
         user = await self._session.get(User, mentor_user_id)
-        tier_row = await self._session.scalar(select(MentorTier).where(MentorTier.user_id == mentor_user_id))
-        raw = (tier_row.tier if tier_row else "PEER").strip().upper()
+        raw = (mp.tier_id or "PEER").strip().upper()
         tier_id = raw if raw in _TIER_IDS else "PEER"
         uid = str(mp.user_id)
         return {

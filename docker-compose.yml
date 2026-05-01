@@ -108,7 +108,8 @@ services:
     volumes:
       - ./ai-recommendation-service/app:/app/app
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/recommendation_db
+      # Same DB as mentoring-service: domain tables + AI `match_*` tables (separate Alembic version table).
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/mentoring
       REDIS_URL: redis://redis:6379/0
       USER_SERVICE_URL: http://user-service:8000
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-in-production}
@@ -128,6 +129,8 @@ services:
         condition: service_healthy
       user-service:
         condition: service_healthy
+      mentoring-service:
+        condition: service_started
     networks:
       - stack
 

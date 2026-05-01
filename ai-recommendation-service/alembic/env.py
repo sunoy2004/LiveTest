@@ -18,7 +18,7 @@ target_metadata = None
 def get_url() -> str:
     url = os.getenv(
         "DATABASE_URL",
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/recommendation_db",
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/mentoring",
     )
     if "+asyncpg" in url:
         return url.replace("+asyncpg", "+psycopg2", 1)
@@ -31,6 +31,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table="alembic_version_ai_recommendation",
     )
     with context.begin_transaction():
         context.run_migrations()

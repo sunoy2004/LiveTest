@@ -3,13 +3,18 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://postgres:123456@/users_db?host=/cloudsql/yanc-website%3Aus-central1%3Amentor-mentee-db"
+    # Same PostgreSQL database name as the mentoring service (`mentoring`); AI owns `match_*` tables only.
+    database_url: str = Field(
+        default="postgresql+asyncpg://postgres:postgres@localhost:5432/mentoring",
+        validation_alias=AliasChoices("DATABASE_URL", "database_url"),
+    )
     redis_url: str = "redis://localhost:6379/0"
     user_service_url: str = "http://localhost:8000"
     internal_api_token: str = "change-me-in-production"

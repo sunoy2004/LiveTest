@@ -5,9 +5,8 @@ Mentor recommendations for mentees using **PostgreSQL + pgvector** (default) or 
 ## Requirements
 
 - Python 3.12+
-- PostgreSQL **with pgvector** (e.g. image `pgvector/pgvector:pg15`) and database `recommendation_db`
+- PostgreSQL **with pgvector** (e.g. image `pgvector/pgvector:pg15`) — use the same **`mentoring`** database as the mentoring service (domain tables + AI `match_*` tables).
 - Redis (caching + pub/sub)
-- User service: `GET /internal/matchmaking/snapshot` with `X-Internal-Token`
 
 ## Run locally (without Vertex)
 
@@ -48,9 +47,11 @@ The database column is `VECTOR(768)`; both default open-source and Vertex config
 - `GET /recommendations?user_id=&limit=` — same contract as before (`mentor_id`, `score` in `[0,1]`).
 - `POST /recommendations/feedback` — JSON `{ "target_user_id", "interaction_type": "REJECTED_SUGGESTION" | "SUCCESSFUL_MENTORSHIP" }`; actor is the JWT subject (or `X-User-Id` in gateway mode).
 
-### Sync with current User Service data
+### Sync with mentoring domain data
 
-Recommendations read from **`match_profiles`**, which are filled from **`GET /internal/matchmaking/snapshot`** on the User Service (all `MentorProfile` + `MenteeProfile` rows: expertise, goals, `is_accepting_requests`, etc.).
+Recommendations read from **`match_profiles`**, populated at startup and on reindex by reading **`mentor_profiles`**, **`mentee_profiles`**, **`users`**, **`mentor_tiers`**, and **`mentorship_connections`** in the same PostgreSQL database (`mentoring`). No HTTP snapshot is required when `DATABASE_URL` points at that DB.
+
+The mentoring service still exposes **`GET /api/v1/internal/matchmaking-snapshot`** (with `X-Internal-Token`) for other callers; it is optional for this service.
 
 After you **seed users**, **change profiles**, or if the AI service started before User Service had data, run a **reindex** so embeddings match the DB:
 
@@ -65,10 +66,10 @@ Use the same `INTERNAL_API_TOKEN` value as in User Service / root `docker-compos
 
 ## Database volume note
 
-The repo root `docker/postgres/init/01-create-databases.sql` creates `recommendation_db` only on **first** Postgres volume init. **Docker images for this service** run `scripts/ensure_recommendation_db.py` before Alembic so an existing volume still gets the database created automatically.
+The shared Postgres instance should include the **`mentoring`** database (created by mentoring migrations or init scripts). **Docker images for this service** run `scripts/ensure_recommendation_db.py` before Alembic so the database named in `DATABASE_URL` exists.
 
 Manual fix (one-off):  
-`docker compose exec postgres psql -U postgres -c "CREATE DATABASE recommendation_db;"`  
+`docker compose exec postgres psql -U postgres -c "CREATE DATABASE mentoring;"`  
 (from repo root, against the stack Postgres container).
 
 If you see **collation version mismatch** on `template1` / `postgres`, the startup script runs `ALTER DATABASE … REFRESH COLLATION VERSION` and may fall back to `CREATE DATABASE … WITH TEMPLATE template0`. If problems persist after a Postgres image upgrade, remove the Postgres volume and recreate it (this deletes local DB data):  

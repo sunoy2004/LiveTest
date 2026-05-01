@@ -1,53 +1,22 @@
 from __future__ import annotations
 import asyncio
 import logging
-from sqlalchemy import text
+
 from app.ai.factory import get_embedding_provider
 from app.infra.db import get_session_factory
+from app.infra.settings import get_settings
 from app.services import recommendation_cache
+from app.services.mentoring_snapshot import build_mentoring_snapshot
 from app.services.profile_ingestion import upsert_from_snapshot
 
 log = logging.getLogger(__name__)
 
+
 async def fetch_snapshot_from_local_db() -> dict:
-    """
-    Fetches the profile data directly from the mentoring service tables
-    in the same database.
-    """
+    """Load mentor/mentee/connection rows from mentoring domain tables (same DB as match_profiles)."""
     fac = get_session_factory()
     async with fac() as session:
-        # Fetch mentors
-        mentors_res = await session.execute(text(
-            "SELECT user_id, bio, expertise, experience_years FROM mentor_profiles"
-        ))
-        mentors = [
-            {"user_id": str(r[0]), "bio": r[1], "expertise": r[2], "experience_years": r[3]}
-            for r in mentors_res.fetchall()
-        ]
-
-        # Fetch mentees
-        mentees_res = await session.execute(text(
-            "SELECT user_id, learning_goals, education_level FROM mentee_profiles"
-        ))
-        mentees = [
-            {"user_id": str(r[0]), "learning_goals": r[1], "education_level": r[2]}
-            for r in mentees_res.fetchall()
-        ]
-
-        # Fetch connections
-        conns_res = await session.execute(text(
-            "SELECT mentor_user_id, mentee_user_id FROM mentorship_connections WHERE status = 'ACTIVE'"
-        ))
-        connections = [
-            {"mentor_id": str(r[0]), "mentee_id": str(r[1])}
-            for r in conns_res.fetchall()
-        ]
-
-        return {
-            "mentors": mentors,
-            "mentees": mentees,
-            "connections": connections
-        }
+        return await build_mentoring_snapshot(session)
 
 async def bootstrap_from_local_db() -> bool:
     """
@@ -65,7 +34,12 @@ async def bootstrap_from_local_db() -> bool:
             n = await upsert_from_snapshot(session, prov, snap)
             await session.commit()
             log.info("Local bootstrap: match_profiles upserted: %d", n)
-        
+
+        if get_settings().recommendation_engine == "graph":
+            from app.services.graph import graph_store
+
+            graph_store.hydrate_from_snapshot(snap)
+
         await recommendation_cache.invalidate_all_recommendation_caches()
         return True
     except Exception as e:
@@ -85,7 +59,12 @@ async def run_full_reindex_from_local_db() -> dict:
     async with fac() as session:
         n_up = await upsert_from_snapshot(session, prov, snap)
         await session.commit()
-    
+
+    if get_settings().recommendation_engine == "graph":
+        from app.services.graph import graph_store
+
+        graph_store.hydrate_from_snapshot(snap)
+
     n_cache = await recommendation_cache.invalidate_all_recommendation_caches()
     return {
         "ok": True,
@@ -94,3 +73,10 @@ async def run_full_reindex_from_local_db() -> dict:
         "match_profiles_upserted": n_up,
         "recommendation_cache_keys_deleted": n_cache,
     }
+
+
+async def rehydrate_from_user_service() -> bool:
+    """
+    Rebuild `match_profiles` from the mentoring database. Used when a mentee has no embedding row yet.
+    """
+    return await bootstrap_from_local_db()

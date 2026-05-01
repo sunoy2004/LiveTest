@@ -1,4 +1,4 @@
-import uuid
+import os
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
@@ -8,9 +8,20 @@ from app.models import MentorProfile, MenteeProfile, MentorshipConnection
 
 router = APIRouter()
 
+_INTERNAL_TOKEN = os.getenv("INTERNAL_API_TOKEN", "")
+
+
+async def require_internal_token(
+    x_internal_token: str | None = Header(None, alias="X-Internal-Token"),
+) -> None:
+    if not _INTERNAL_TOKEN or x_internal_token != _INTERNAL_TOKEN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Invalid internal token")
+
+
 @router.get("/matchmaking-snapshot")
 async def get_matchmaking_snapshot(
-    db: AsyncSession = Depends(get_db)
+    _: None = Depends(require_internal_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Internal endpoint for AI service to fetch all data for re-indexing.

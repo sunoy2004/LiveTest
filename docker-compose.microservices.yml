@@ -8,7 +8,7 @@ services:
   ai-service:
     build: ./ai-recommendation-service
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/recommendation_db}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/mentoring}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8000}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-in-production}

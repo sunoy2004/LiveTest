@@ -39,7 +39,7 @@ async def on_session_completed(mentee_uid: str, mentor_uid: str) -> None:
 async def on_profile_updated(_user_id: str | None = None) -> None:
     if get_settings().recommendation_engine != "pgvector":
         return
-    snap = fetch_matchmaking_snapshot()
+    snap = await fetch_matchmaking_snapshot()
     if not snap:
         return
     prov = get_embedding_provider()

@@ -23,7 +23,7 @@ class RecommendationService:
 
     async def recommend(self, user_id: str, limit: int) -> list[dict[str, Any]]:
         s = get_settings()
-        snap = fetch_matchmaking_snapshot()
+        snap = await fetch_matchmaking_snapshot()
         if s.recommendation_engine == "graph":
             from app.services.graph import graph_store
 

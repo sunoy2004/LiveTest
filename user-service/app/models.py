@@ -79,8 +79,7 @@ class MenteeProfile(Base):
     user = relationship("User", back_populates="mentee_profile")
     mentorship_requests = relationship(
         "MentorshipRequest",
-        back_populates="mentee",
-        foreign_keys="MentorshipRequest.mentee_id",
+        foreign_keys="MentorshipRequest.sender_user_id",
     )
 
 
@@ -107,13 +106,9 @@ class MentorProfile(Base):
     tier = relationship("MentorTier", lazy="joined")
     mentorship_requests = relationship(
         "MentorshipRequest",
-        back_populates="mentor",
-        foreign_keys="MentorshipRequest.mentor_id",
+        foreign_keys="MentorshipRequest.receiver_user_id",
     )
 
-
-class MentorshipRequest(Base):
-    __tablename__ = "mentorship_requests"
 
 class MentorshipRequest(Base):
     __tablename__ = "mentorship_requests"
@@ -135,8 +130,9 @@ class MentorshipRequest(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    mentee = relationship("MenteeProfile", foreign_keys=[mentee_id], back_populates="mentorship_requests")
-    mentor = relationship("MentorProfile", foreign_keys=[mentor_id], back_populates="mentorship_requests")
+    # Relationships updated to new column names
+    sender = relationship("User", foreign_keys=[sender_user_id])
+    receiver = relationship("User", foreign_keys=[receiver_user_id])
 
 
 class MentorshipConnection(Base):

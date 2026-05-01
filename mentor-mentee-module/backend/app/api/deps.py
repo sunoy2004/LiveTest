@@ -48,14 +48,12 @@ async def require_user_id(
                 user_id=uid,
                 email=payload["email"],
                 role=role_array,
-                is_admin=payload.get("is_admin", False),
                 password_hash="[REDACTED]"
             ).on_conflict_do_update(
                 index_elements=[User.user_id],
                 set_={
                     "email": payload["email"],
                     "role": role_array,
-                    "is_admin": payload.get("is_admin", False)
                 }
             )
             await db.execute(stmt)

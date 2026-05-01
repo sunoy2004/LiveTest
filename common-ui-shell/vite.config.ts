@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
   // Same-origin URL so the browser can `import()` the remote (avoids cross-origin module + CORS issues).
   // Override with VITE_MENTOR_REMOTE_ENTRY for deployed hosts that load the remote from a CDN.
   const mentorRemote =
-    env.VITE_MENTOR_REMOTE_ENTRY || `${mentorProxyPrefix}/assets/remoteEntry.js`;
+    env.VITE_MENTOR_REMOTE_ENTRY || `${mentorProxyPrefix}/remoteEntry.js`;
 
   return {
     server: {

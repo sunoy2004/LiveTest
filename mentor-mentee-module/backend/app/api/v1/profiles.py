@@ -49,5 +49,5 @@ async def get_my_profiles(
     return ProfileMeResponse(
         mentee_profile=mentee,
         mentor_profile=mentor,
-        is_admin=user.is_admin if user else False
+        is_admin="ADMIN" in (user.role or []) if user else False
     )

@@ -144,7 +144,7 @@ steps:
           docker push "$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$img:latest"
         done
 
-  # Cloud Run: new revision from Artifact Registry (parallel after push)
+  # Cloud Run: `gcloud run deploy <service>` updates the existing service (new revision); service name = $_CLOUD_RUN_*.
   - id: deploy-user-service
     name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     waitFor: ['push-rollout-targets']
@@ -261,15 +261,15 @@ substitutions:
   # Cloud SQL instance connection name PROJECT:REGION:INSTANCE (unix socket mount for default DATABASE_URL in repo).
   # Omit from deploy (and use TCP DATABASE_URL) only if you do not use Cloud SQL for these services.
   _CLOUD_SQL_INSTANCE: 'yanc-website:us-central1:mentor-mentee-db'
-  # Cloud Run service names (must match services in your project; override per env if different)
-  _CLOUD_RUN_USER_SERVICE: user-service
-  _CLOUD_RUN_MENTORING_SERVICE: mentoring-service
-  _CLOUD_RUN_COMMON_UI: common-ui
-  _CLOUD_RUN_MENTEE_UI: mentee-ui
+  # Existing Cloud Run *service names* (console list). Deploy targets these names → new revisions only.
+  _CLOUD_RUN_USER_SERVICE: user-service-1095720168864
+  _CLOUD_RUN_MENTORING_SERVICE: mentoring-service-1095720168864
+  _CLOUD_RUN_COMMON_UI: common-ui-1095720168864
+  _CLOUD_RUN_MENTEE_UI: mentee-ui-1095720168864
   # Uncomment when enabling optional Cloud Run deploy blocks above:
-  # _CLOUD_RUN_AI_SERVICE: ai-service
-  # _CLOUD_RUN_GAMIFICATION_SERVICE: gamification-service
-  # _CLOUD_RUN_NOTIFICATION_SERVICE: notification-service
+  # _CLOUD_RUN_AI_SERVICE: ai-service-1095720168864
+  # _CLOUD_RUN_GAMIFICATION_SERVICE: gamification-service-1095720168864
+  # _CLOUD_RUN_NOTIFICATION_SERVICE: notification-service-1095720168864
   _USER_SERVICE_URL: "https://user-service-1095720168864-1095720168864.us-central1.run.app"
   _MENTORING_URL: "https://mentoring-service-1095720168864-1095720168864.us-central1.run.app"
   _GAMIFICATION_URL: "https://gamification-service-1095720168864-1095720168864.us-central1.run.app"

@@ -30,36 +30,53 @@ async def require_user_id(
         )
     try:
         payload = auth.verify_token(creds.credentials)
-        uid = uuid.UUID(payload["user_id"])
+        if not payload or "user_id" not in payload:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+            
+        try:
+            uid = uuid.UUID(payload["user_id"])
+        except ValueError:
+            raise HTTPException(status_code=401, detail=f"Invalid user_id format: {payload.get('user_id')}")
         
-        # Sync User replica
-        # Architecture Rule: Mentoring DB keeps a replica of users
-        # user_id is the universal identifier
+        # Defensive role handling
         raw_role = payload.get("role", [])
         role_array = raw_role if isinstance(raw_role, list) else [raw_role] if raw_role else []
 
-        stmt = insert(User).values(
-            user_id=uid,
-            email=payload["email"],
-            role=role_array,
-            is_admin=payload.get("is_admin", False),
-            password_hash="[REDACTED]" # Not needed in replica but schema requires it
-        ).on_conflict_do_update(
-            index_elements=[User.user_id],
-            set_={
-                "email": payload["email"],
-                "role": role_array,
-                "is_admin": payload.get("is_admin", False)
-            }
-        )
-        await db.execute(stmt)
-        await db.commit()
+        # Sync User replica
+        try:
+            stmt = insert(User).values(
+                user_id=uid,
+                email=payload["email"],
+                role=role_array,
+                is_admin=payload.get("is_admin", False),
+                password_hash="[REDACTED]"
+            ).on_conflict_do_update(
+                index_elements=[User.user_id],
+                set_={
+                    "email": payload["email"],
+                    "role": role_array,
+                    "is_admin": payload.get("is_admin", False)
+                }
+            )
+            await db.execute(stmt)
+            await db.commit()
+        except Exception as db_exc:
+            # If DB sync fails, we LOG it but might allow the request if the user already exists?
+            # Actually, better to fail and fix the schema.
+            print(f"DATABASE SYNC ERROR: {str(db_exc)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database synchronization failed: {str(db_exc)}"
+            )
         
         return uid
-    except (ValueError, KeyError) as e:
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"AUTH ERROR: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Not authenticated: {str(e)}",
+            detail=f"Authentication failed: {str(e)}",
         )
 
 

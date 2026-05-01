@@ -12,6 +12,7 @@ from app.schemas.profile import (
     ProfileMeResponse,
 )
 from app.services.profile_service import ProfileService
+from app.models.user import User
 
 router = APIRouter()
 

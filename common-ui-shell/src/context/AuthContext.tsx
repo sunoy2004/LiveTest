@@ -114,7 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const newUser: AuthUser = {
       id: decodedPayload.user_id,
       email: decodedPayload.email,
-      is_admin: decodedPayload.is_admin
+      is_admin: decodedPayload.is_admin,
+      roles: decodedPayload.role
     };
 
     persistAuth(token, newUser);

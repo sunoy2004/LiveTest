@@ -4,4 +4,5 @@ export type ShellUser = {
   id: string;
   email: string;
   is_admin?: boolean;
+  roles?: string[];
 };

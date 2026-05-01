@@ -5,6 +5,7 @@ export type AuthUser = {
   id: string;
   email: string;
   is_admin?: boolean;
+  roles?: string[];
 };
 
 export function readStoredAuth(): { token: string | null; user: AuthUser | null } {

@@ -19,7 +19,7 @@ def get_full_profile(db: Session, *, user: User) -> FullProfileResponse:
     return FullProfileResponse(
         user_id=user.id,
         email=user.email,
-        is_admin=(user.role == "ADMIN"),
+        is_admin=("ADMIN" in (user.role or [])),
         mentor_profile=None,
         mentee_profile=None,
     )

@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, String, Text, Boolean
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, synonym
 
 from app.models.base import Base
@@ -15,7 +15,8 @@ class User(Base):
     id = synonym("user_id")
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    role: Mapped[str] = mapped_column(String(32), nullable=False) # MENTOR, MENTEE, BOTH, ADMIN
+    role: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=[]) # ['MENTOR', 'MENTEE', 'ADMIN']
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

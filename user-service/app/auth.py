@@ -31,7 +31,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_token(
     user_id: UUID,
     email: str,
-    role: str,
+    role: list[str],
     *,
     is_admin: bool = False,
 ) -> str:

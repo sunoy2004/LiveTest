@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import synonym
 
 from app.db import Base
@@ -15,5 +15,5 @@ class User(Base):
     id = synonym("user_id")
     email = Column(Text, unique=True, nullable=False, index=True)
     password_hash = Column(Text, nullable=False)
-    role = Column(String(32), nullable=False, default="MENTEE")  # MENTOR, MENTEE, BOTH, ADMIN
+    role = Column(ARRAY(Text), nullable=False, default=[])  # ['MENTOR', 'MENTEE', 'ADMIN']
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

@@ -209,7 +209,7 @@ def list_admin_users(db: Session, *, limit: int) -> list[AdminUserListItem]:
             AdminUserListItem(
                 user_id=u.id,
                 email=u.email,
-                is_admin=(u.role == "ADMIN"),
+                is_admin=("ADMIN" in (u.role or [])),
                 is_mentor=is_m,
                 is_mentee=is_me,
             )

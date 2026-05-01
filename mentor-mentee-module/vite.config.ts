@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => {
       react(),
       federation({
         name: "mentorMentee",
-        filename: "remoteEntry.js",
+        filename: "assets/remoteEntry.js",
         exposes: {
           "./App": "./src/App.tsx",
         },

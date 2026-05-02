@@ -28,25 +28,30 @@ def _display_name(email: str | None, full_name: str | None) -> str:
     return ""
 
 
-def _safe_columns(sync_conn, table: str) -> set[str]:
+def _inspector(sync_session):
+    """AsyncSession.run_sync passes a sync ORM Session, not a Connection — inspect the engine."""
+    return inspect(sync_session.get_bind())
+
+
+def _safe_columns(sync_session, table: str) -> set[str]:
     try:
-        return {c["name"] for c in inspect(sync_conn).get_columns(table)}
+        return {c["name"] for c in _inspector(sync_session).get_columns(table)}
     except Exception:
         return set()
 
 
 async def _table_names(session: AsyncSession) -> set[str]:
-    def _names(sync_conn) -> set[str]:
-        return set(inspect(sync_conn).get_table_names())
+    def _names(sync_session) -> set[str]:
+        return set(_inspector(sync_session).get_table_names())
 
     return await session.run_sync(_names)
 
 
 async def _table_columns(session: AsyncSession) -> tuple[set[str], set[str]]:
-    def _probe(sync_conn) -> tuple[set[str], set[str]]:
+    def _probe(sync_session) -> tuple[set[str], set[str]]:
         return (
-            _safe_columns(sync_conn, "mentor_profiles"),
-            _safe_columns(sync_conn, "mentee_profiles"),
+            _safe_columns(sync_session, "mentor_profiles"),
+            _safe_columns(sync_session, "mentee_profiles"),
         )
 
     return await session.run_sync(_probe)

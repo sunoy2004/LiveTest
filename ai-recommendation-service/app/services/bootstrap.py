@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from typing import Any
 from urllib.parse import urlparse
 
 from sqlalchemy import text
@@ -160,3 +161,65 @@ async def rehydrate_from_user_service() -> bool:
     """
     ok, _msg = await bootstrap_from_local_db()
     return ok
+
+
+async def collect_matchmaking_diagnostics() -> dict[str, Any]:
+    """
+    Lightweight counts from the same DB as `match_profiles` (mentoring domain + AI tables).
+    Use in /health and internal status — does not run embedding or full snapshot load.
+    """
+    out: dict[str, Any] = {
+        "database_target": describe_database_config(),
+    }
+    fac = get_session_factory()
+    try:
+        async with fac() as session:
+            for table in ("mentor_profiles", "mentee_profiles"):
+                try:
+                    r = await session.execute(
+                        text(f"SELECT COUNT(*) FROM {table}")
+                    )
+                    out[f"{table}_rows"] = int(r.scalar_one())
+                except Exception as e:
+                    out[f"{table}_error"] = f"{type(e).__name__}: {e!s}"[:240]
+
+            try:
+                r = await session.execute(text("SELECT COUNT(*) FROM match_profiles"))
+                out["match_profiles_count"] = int(r.scalar_one())
+            except Exception as e:
+                out["match_profiles_error"] = f"{type(e).__name__}: {e!s}"[:240]
+
+            try:
+                r = await session.execute(
+                    text(
+                        """
+                        SELECT role::text AS role, COUNT(*)::int AS n
+                        FROM match_profiles
+                        GROUP BY role
+                        """
+                    )
+                )
+                out["match_profiles_by_role"] = {
+                    str(row[0]): int(row[1]) for row in r.fetchall()
+                }
+            except Exception as e:
+                out["match_profiles_by_role_error"] = f"{type(e).__name__}: {e!s}"[:240]
+    except Exception as e:
+        out["diagnostics_error"] = f"{type(e).__name__}: {e!s}"[:400]
+
+    mr = out.get("mentor_profiles_rows")
+    me = out.get("mentee_profiles_rows")
+    mp = out.get("match_profiles_count")
+    if isinstance(mr, int) and isinstance(me, int) and mr == 0 and me == 0:
+        out["hint"] = (
+            "No rows in mentor_profiles/mentee_profiles on this DATABASE_URL. "
+            "Use the same PostgreSQL database as mentoring-service, or seed profiles first."
+        )
+    elif (isinstance(mr, int) and mr > 0) or (isinstance(me, int) and me > 0):
+        if mp == 0:
+            out["hint"] = (
+                "Mentoring profiles exist but match_profiles is empty: wait for startup embedding "
+                "bootstrap or call POST /internal/matchmaking/reindex with X-Internal-Token."
+            )
+
+    return out

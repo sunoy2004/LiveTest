@@ -2,7 +2,10 @@ from __future__ import annotations
 import os
 from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from app.services.bootstrap import run_full_reindex_from_local_db
+from app.services.bootstrap import (
+    collect_matchmaking_diagnostics,
+    run_full_reindex_from_local_db,
+)
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -16,6 +19,17 @@ def require_internal_token(
             status.HTTP_403_FORBIDDEN,
             detail="Invalid internal token",
         )
+
+@router.get("/matchmaking/status")
+async def matchmaking_status(
+    _: None = Depends(require_internal_token),
+) -> dict[str, Any]:
+    """
+    Row counts for mentoring domain tables vs match_profiles (no embedding work).
+    If mentor_profiles/mentee_profiles have rows but match_profiles is empty, run POST /internal/matchmaking/reindex.
+    """
+    return await collect_matchmaking_diagnostics()
+
 
 @router.post("/matchmaking/reindex")
 async def matchmaking_reindex(

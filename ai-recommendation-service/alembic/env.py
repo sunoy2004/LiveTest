@@ -38,7 +38,12 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    # Must match offline mode: mentoring-service uses default `alembic_version` on the same DB.
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        version_table="alembic_version_ai_recommendation",
+    )
     with context.begin_transaction():
         context.run_migrations()
 

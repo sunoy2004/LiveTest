@@ -204,6 +204,9 @@ steps:
       - '--port=80'
       - '--quiet'
 
+  # AI recommendation service: Cloud Run env DATABASE_URL must be the *mentoring* database (same
+  # DB name / instance as mentoring-service), not users_db. After deploy, if mentor_profiles rows
+  # exist but match_profiles stays empty, call POST /internal/matchmaking/reindex with INTERNAL_API_TOKEN.
   - id: deploy-ai-service
     name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     waitFor: ['push-rollout-targets']

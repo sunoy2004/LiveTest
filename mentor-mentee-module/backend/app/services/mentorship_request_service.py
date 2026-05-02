@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, or_, and_
+from sqlalchemy import desc, select, or_, and_
 from sqlalchemy.orm import aliased
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -134,6 +134,45 @@ class MentorshipRequestService:
                 "mentor_name": from_email(email),
             }
             out.append(d)
+        return out
+
+    async def list_request_history(self, user_id: uuid.UUID, *, limit: int = 100) -> list[dict]:
+        """All `mentorship_requests` where the user is sender (mentee) or receiver (mentor)."""
+        limit = max(1, min(int(limit), 200))
+        SenderUser = aliased(User)
+        ReceiverUser = aliased(User)
+        stmt = (
+            select(MentorshipRequest, SenderUser.email, ReceiverUser.email)
+            .join(SenderUser, MentorshipRequest.sender_user_id == SenderUser.user_id)
+            .join(ReceiverUser, MentorshipRequest.receiver_user_id == ReceiverUser.user_id)
+            .where(
+                or_(
+                    MentorshipRequest.sender_user_id == user_id,
+                    MentorshipRequest.receiver_user_id == user_id,
+                )
+            )
+            .order_by(desc(MentorshipRequest.created_at))
+            .limit(limit)
+        )
+        results = (await self._session.execute(stmt)).all()
+        uid_str = str(user_id)
+        out: list[dict] = []
+        for req, sender_email, receiver_email in results:
+            intro = getattr(req, "intro_message", None) or ""
+            out.append(
+                {
+                    "sender_user_id": str(req.sender_user_id),
+                    "receiver_user_id": str(req.receiver_user_id),
+                    "status": req.status,
+                    "intro_message": intro,
+                    "created_at": req.created_at.isoformat() if req.created_at else None,
+                    "mentee_name": from_email(sender_email),
+                    "mentor_name": from_email(receiver_email),
+                    "you_are": "mentor"
+                    if uid_str == str(req.receiver_user_id)
+                    else "mentee",
+                }
+            )
         return out
 
     async def get_goals_by_users(self, mentor_id: uuid.UUID, mentee_id: uuid.UUID) -> list[dict]:

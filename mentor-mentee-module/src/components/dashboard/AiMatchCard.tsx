@@ -107,6 +107,7 @@ const AiMatchCard = ({ match, token, requestLocked }: Props) => {
       setIntro(DEFAULT_MENTORSHIP_INTRO_MESSAGE);
       invalidateAi();
       void qc.invalidateQueries({ queryKey: ["user-service", "mentoring"] });
+      void qc.invalidateQueries({ queryKey: ["user-service", "mentoring", "requests-history"] });
     } catch (e) {
       const msg =
         e instanceof MentoringApiError

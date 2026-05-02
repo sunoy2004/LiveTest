@@ -76,6 +76,7 @@ export default function IncomingMatchmakerRequestsPanel({
 
   const invalidateAfterDecision = () => {
     void queryClient.invalidateQueries({ queryKey: ["user-service", "mentoring"] });
+    void queryClient.invalidateQueries({ queryKey: ["user-service", "mentoring", "requests-history"] });
     void queryClient.invalidateQueries({ queryKey: ["user-service", "dashboard"] });
     void queryClient.invalidateQueries({ queryKey: ["user-service", "dashboard", "stats"] });
     void queryClient.invalidateQueries({ queryKey: ["mentoring", "connected-mentors"] });

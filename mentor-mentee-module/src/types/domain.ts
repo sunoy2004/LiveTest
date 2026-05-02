@@ -73,6 +73,19 @@ export interface MentorshipRequestBody {
   intro_message: string;
 }
 
+/** GET /api/v1/requests/history — mentorship_requests rows involving the current user */
+export interface MentorshipRequestHistoryRow {
+  sender_user_id: string;
+  receiver_user_id: string;
+  status: string;
+  intro_message: string;
+  created_at: string | null;
+  mentee_name: string;
+  mentor_name: string;
+  /** Whether you were the mentor (received the request) or mentee (sent it). */
+  you_are: "mentor" | "mentee";
+}
+
 export interface AiRecommendationItem {
   mentor_id: string;
   score?: number;

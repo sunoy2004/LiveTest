@@ -96,6 +96,8 @@ export const mentoringPaths = {
   dashboardVault: `${getMentoringApiBaseUrl()}${MENTORING_API_PREFIX}/dashboard/vault`,
   /** Workflow 2 — mentorship request pitch (Mentoring Service authority). */
   requests: `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/requests`,
+  requestsHistory: (limit = 100) =>
+    `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/requests/history?limit=${encodeURIComponent(String(limit))}`,
   requestStatus: (requestId: string) =>
     `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/requests/${encodeURIComponent(requestId)}/status`,
   sessionHistory: (sessionId: string) =>

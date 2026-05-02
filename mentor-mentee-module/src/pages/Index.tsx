@@ -17,6 +17,7 @@ import ManageAvailabilityDialog from "@/components/dashboard/ManageAvailabilityD
 import IncomingSessionRequestsPanel from "@/components/dashboard/IncomingSessionRequestsPanel";
 import IncomingMatchmakerRequestsPanel from "@/components/dashboard/IncomingMatchmakerRequestsPanel";
 import SessionBookingHistoryDialog from "@/components/dashboard/SessionBookingHistoryDialog";
+import MatchmakerRequestHistoryDialog from "@/components/dashboard/MatchmakerRequestHistoryDialog";
 import CreditWalletWidget from "@/components/dashboard/CreditWalletWidget";
 import ConsentBanner from "@/components/dashboard/ConsentBanner";
 import {
@@ -158,6 +159,7 @@ const Index = () => {
   const greetingName = profileData?.first_name || user?.email?.split("@")[0] || "there";
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [bookingHistoryOpen, setBookingHistoryOpen] = useState(false);
+  const [matchmakerHistoryOpen, setMatchmakerHistoryOpen] = useState(false);
   const [manageAvailabilityOpen, setManageAvailabilityOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchProfile | null>(null);
@@ -525,6 +527,11 @@ const Index = () => {
           onOpenChange={setBookingHistoryOpen}
           token={token}
         />
+        <MatchmakerRequestHistoryDialog
+          open={matchmakerHistoryOpen}
+          onOpenChange={setMatchmakerHistoryOpen}
+          token={token}
+        />
         <ManageAvailabilityDialog
           open={manageAvailabilityOpen}
           onOpenChange={setManageAvailabilityOpen}
@@ -547,15 +554,33 @@ const Index = () => {
               .join(" ")
           }
           action={
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-xs"
-              onClick={() => void handleRefreshAiMatches()}
-              disabled={aiFetching}
-            >
-              <RefreshCw className={`h-3 w-3 mr-1 ${aiFetching ? "animate-spin" : ""}`} /> Refresh
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                onClick={() => setMatchmakerHistoryOpen(true)}
+                disabled={!token || !isMentoringApiConfigured()}
+                title={
+                  !isMentoringApiConfigured()
+                    ? "Set VITE_MENTORING_API_BASE_URL to load request history"
+                    : !token
+                      ? "Sign in to view history"
+                      : undefined
+                }
+              >
+                <History className="h-3 w-3 mr-1" /> History
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                onClick={() => void handleRefreshAiMatches()}
+                disabled={aiFetching}
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${aiFetching ? "animate-spin" : ""}`} /> Refresh
+              </Button>
+            </div>
           }
         >
           <div className="space-y-5">

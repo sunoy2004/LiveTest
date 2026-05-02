@@ -1,10 +1,11 @@
 import { mentoringPaths } from "@/config/mentoring";
-import { mentoringJson } from "@/lib/api/client";
+import { MentoringApiError, mentoringJson } from "@/lib/api/client";
 import type {
   MentoringProfileMeResponse,
   PostMenteeProfileBody,
   SchedulingBookBody,
   MentorshipRequestBody,
+  MentorshipRequestHistoryRow,
   SearchResultItem,
   SearchRole,
 } from "@/types/domain";
@@ -65,6 +66,74 @@ export async function postMentorshipRequest(body: MentorshipRequestBody): Promis
 
 export async function getMentorshipRequestsIncoming(): Promise<unknown[]> {
   return mentoringJson(`${mentoringPaths.requests}/incoming`, { method: "GET" }) as Promise<unknown[]>;
+}
+
+export async function getMentorshipRequestsOutgoing(): Promise<unknown[]> {
+  return mentoringJson(`${mentoringPaths.requests}/outgoing`, { method: "GET" }) as Promise<unknown[]>;
+}
+
+/**
+ * When GET /requests/history is missing (older mentoring-service image — 404),
+ * approximate history from /incoming + /outgoing (pending-focused; no timestamps).
+ */
+async function mentorshipHistoryLegacyFallback(): Promise<MentorshipRequestHistoryRow[]> {
+  const [incomingRaw, outgoingRaw] = await Promise.all([
+    getMentorshipRequestsIncoming(),
+    getMentorshipRequestsOutgoing(),
+  ]);
+  const seen = new Set<string>();
+  const rows: MentorshipRequestHistoryRow[] = [];
+
+  for (const raw of incomingRaw as Record<string, unknown>[]) {
+    const s = String(raw.sender_user_id ?? "");
+    const r = String(raw.receiver_user_id ?? "");
+    const key = `${s}|${r}`;
+    if (!s || !r || seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      sender_user_id: s,
+      receiver_user_id: r,
+      status: String(raw.status ?? "PENDING"),
+      intro_message: String(raw.intro_message ?? ""),
+      created_at: null,
+      mentee_name: String(raw.mentee_name ?? "Mentee"),
+      mentor_name: "",
+      you_are: "mentor",
+    });
+  }
+
+  for (const raw of outgoingRaw as Record<string, unknown>[]) {
+    const s = String(raw.sender_user_id ?? "");
+    const r = String(raw.receiver_user_id ?? "");
+    const key = `${s}|${r}`;
+    if (!s || !r || seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      sender_user_id: s,
+      receiver_user_id: r,
+      status: String(raw.status ?? "PENDING"),
+      intro_message: "",
+      created_at: null,
+      mentee_name: "",
+      mentor_name: String(raw.mentor_name ?? "Mentor"),
+      you_are: "mentee",
+    });
+  }
+
+  return rows;
+}
+
+export async function getMentorshipRequestHistory(limit = 100): Promise<MentorshipRequestHistoryRow[]> {
+  try {
+    return await mentoringJson<MentorshipRequestHistoryRow[]>(mentoringPaths.requestsHistory(limit), {
+      method: "GET",
+    });
+  } catch (e) {
+    if (e instanceof MentoringApiError && e.status === 404) {
+      return mentorshipHistoryLegacyFallback();
+    }
+    throw e;
+  }
 }
 
 export async function putMentorshipRequestStatus(

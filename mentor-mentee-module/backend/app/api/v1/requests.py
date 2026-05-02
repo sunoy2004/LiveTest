@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import get_mentorship_request_service, require_user_id
 from app.schemas.request import MentorshipRequestCreate, MentorshipRequestRead, MentorshipRequestStatusUpdate
@@ -37,6 +37,16 @@ async def get_outgoing_requests(
 ) -> list[dict]:
     """Mentee fetches requests they sent."""
     return await svc.get_outgoing_requests(user_id)
+
+
+@router.get("/history", response_model=list[dict])
+async def get_matchmaking_request_history(
+    user_id: Annotated[uuid.UUID, Depends(require_user_id)],
+    svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> list[dict]:
+    """Matchmaking request history from `mentorship_requests` (sent or received by the current user)."""
+    return await svc.list_request_history(user_id, limit=limit)
 
 
 @router.get("/connections", response_model=list[dict])

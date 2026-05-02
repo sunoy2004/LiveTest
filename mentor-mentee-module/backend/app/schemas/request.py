@@ -1,4 +1,6 @@
 import uuid
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 class MentorshipRequestCreate(BaseModel):
@@ -8,7 +10,7 @@ class MentorshipRequestCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 class MentorshipRequestStatusUpdate(BaseModel):
-    status: str = Field(..., description="ACCEPTED or DECLINED")
+    status: Literal["ACCEPTED", "DECLINED"] = Field(..., description="Accept or decline the pending request")
 
 class MentorshipRequestRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)

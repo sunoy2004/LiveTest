@@ -61,13 +61,17 @@ async def get_connection_goals(
 
 
 @router.put("/{sender_user_id}/status", response_model=dict)
+@router.post("/{sender_user_id}/status", response_model=dict)
 async def update_mentorship_request_status(
     sender_user_id: uuid.UUID,
     body: MentorshipRequestStatusUpdate,
     user_id: Annotated[uuid.UUID, Depends(require_user_id)],
     svc: Annotated[MentorshipRequestService, Depends(get_mentorship_request_service)],
 ) -> dict:
-    """Mentor (user_id) accepts or declines request from sender_user_id."""
+    """Mentor (user_id) accepts or declines request from sender_user_id.
+
+    POST is registered alongside PUT: some proxies strip or mishandle PUT bodies toward Cloud Run.
+    """
     return await svc.update_status(
         sender_user_id=sender_user_id,
         receiver_user_id=user_id,

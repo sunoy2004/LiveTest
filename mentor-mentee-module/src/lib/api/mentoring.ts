@@ -71,8 +71,9 @@ export async function putMentorshipRequestStatus(
   requestId: string,
   body: { status: "ACCEPTED" | "DECLINED" },
 ): Promise<unknown> {
+  /** POST avoids proxies that mishandle PUT bodies; backend exposes PUT + POST on same path. */
   return mentoringJson(mentoringPaths.requestStatus(requestId), {
-    method: "PUT",
+    method: "POST",
     body: JSON.stringify(body),
   });
 }

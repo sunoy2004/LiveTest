@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getMentorshipRequestsIncoming, putMentorshipRequestStatus } from "@/lib/api/mentoring";
-import { MentoringApiError } from "@/lib/api/client";
+import { formatApiError } from "@/lib/api/errorMessage";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -26,10 +26,14 @@ export interface IncomingMatchmakerRequestRow {
   intro_message?: string;
 }
 
-function describeApiError(e: unknown): string {
-  if (e instanceof MentoringApiError) return e.message;
-  if (e instanceof Error) return e.message;
-  return "Request failed";
+/** Mentee / sender id for PUT `/requests/{sender_user_id}/status` (supports alternate API keys). */
+function menteeIdForStatusPut(r: IncomingMatchmakerRequestRow): string {
+  const x = r as IncomingMatchmakerRequestRow & {
+    mentee_user_id?: string;
+    senderUserId?: string;
+  };
+  const raw = r.sender_user_id ?? x.mentee_user_id ?? x.senderUserId;
+  return String(raw ?? "").trim();
 }
 
 interface IncomingMatchmakerRequestsPanelProps {
@@ -79,15 +83,24 @@ export default function IncomingMatchmakerRequestsPanel({
 
   const handleReject = (r: IncomingMatchmakerRequestRow) => {
     void (async () => {
+      const menteeId = menteeIdForStatusPut(r);
+      if (!menteeId) {
+        toast({
+          title: "Could not decline",
+          description: "Missing mentee id on this request row. Refresh the page.",
+          variant: "destructive",
+        });
+        return;
+      }
       try {
-        await putMentorshipRequestStatus(r.sender_user_id, { status: "DECLINED" });
+        await putMentorshipRequestStatus(menteeId, { status: "DECLINED" });
         toast({ title: "Request declined" });
         setDetail((d) => (d?.sender_user_id === r.sender_user_id ? null : d));
         invalidateAfterDecision();
       } catch (e) {
         toast({
           title: "Could not reject",
-          description: describeApiError(e),
+          description: formatApiError(e),
           variant: "destructive",
         });
       }
@@ -96,15 +109,24 @@ export default function IncomingMatchmakerRequestsPanel({
 
   const handleAccept = (r: IncomingMatchmakerRequestRow) => {
     void (async () => {
+      const menteeId = menteeIdForStatusPut(r);
+      if (!menteeId) {
+        toast({
+          title: "Could not accept",
+          description: "Missing mentee id on this request row. Refresh the page.",
+          variant: "destructive",
+        });
+        return;
+      }
       try {
-        await putMentorshipRequestStatus(r.sender_user_id, { status: "ACCEPTED" });
+        await putMentorshipRequestStatus(menteeId, { status: "ACCEPTED" });
         toast({ title: "Connection accepted", description: "You are now connected." });
         setDetail((d) => (d?.sender_user_id === r.sender_user_id ? null : d));
         invalidateAfterDecision();
       } catch (e) {
         toast({
           title: "Could not accept",
-          description: describeApiError(e),
+          description: formatApiError(e),
           variant: "destructive",
         });
       }
@@ -116,7 +138,7 @@ export default function IncomingMatchmakerRequestsPanel({
       <div className="space-y-2">
         {rows.map((r) => (
           <div
-            key={r.sender_user_id}
+            key={menteeIdForStatusPut(r) || r.mentee_name}
             className="flex flex-col gap-3 rounded-xl border border-border bg-card/50 p-3 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="min-w-0">

@@ -18,6 +18,7 @@ import {
   rejectSessionRequest,
 } from "@/api/userServiceMentoringApi";
 import type { IncomingSessionRequestItem } from "@/types/userServiceMentoring";
+import { formatApiError } from "@/lib/api/errorMessage";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +90,7 @@ export default function IncomingSessionRequestsPanel({
       } catch (e) {
         toast({
           title: "Could not reject",
-          description: e instanceof Error ? e.message : "Request failed",
+          description: formatApiError(e),
           variant: "destructive",
         });
       }
@@ -107,7 +108,7 @@ export default function IncomingSessionRequestsPanel({
       } catch (e) {
         toast({
           title: "Could not accept",
-          description: e instanceof Error ? e.message : "Request failed",
+          description: formatApiError(e),
           variant: "destructive",
         });
       }

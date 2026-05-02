@@ -14,6 +14,20 @@ function readShellAuthHeaders(): { token: string | null; userId: string | null }
   }
 }
 
+function stringifyErrPart(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (typeof v === "object") {
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return "Invalid error detail";
+    }
+  }
+  return String(v);
+}
+
 function formatMentoringErrorDetail(parsed: unknown, fallback: string): string {
   if (typeof parsed !== "object" || !parsed || !("detail" in parsed)) {
     return fallback || "Request failed";
@@ -23,15 +37,19 @@ function formatMentoringErrorDetail(parsed: unknown, fallback: string): string {
   if (Array.isArray(d)) {
     return d
       .map((item) => {
-        if (typeof item === "object" && item && "msg" in item) {
-          return String((item as { msg?: unknown }).msg ?? "");
+        if (typeof item === "object" && item) {
+          const o = item as { msg?: unknown; message?: unknown; type?: unknown };
+          const m = o.msg ?? o.message;
+          if (m !== undefined) return stringifyErrPart(m);
+          if (o.type) return stringifyErrPart(o.type);
         }
-        return JSON.stringify(item);
+        return stringifyErrPart(item);
       })
-      .filter(Boolean)
+      .filter((s) => s.length > 0)
       .join("; ");
   }
-  if (d != null) return JSON.stringify(d);
+  if (d != null && typeof d === "object") return stringifyErrPart(d);
+  if (d != null) return stringifyErrPart(d);
   return fallback || "Request failed";
 }
 

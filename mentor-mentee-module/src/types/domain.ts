@@ -19,6 +19,8 @@ export interface SearchResultItem {
   mentor_profile_id?: string | null;
   first_name?: string | null;
   last_name?: string | null;
+  /** Optional combined label from some gateways */
+  full_name?: string | null;
   role: Exclude<SearchRole, "all">;
   expertise: string[];
   tier?: MentorTierId | null;

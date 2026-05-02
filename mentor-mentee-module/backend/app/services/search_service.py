@@ -1,6 +1,8 @@
 import uuid
-from sqlalchemy import or_, select
+
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models import MenteeProfile, MentorProfile, User
 from app.schemas.search import SearchResult, SearchRole
 
@@ -51,9 +53,14 @@ class SearchService:
         if user_id is not None:
             stmt = stmt.where(MentorProfile.user_id == user_id)
         elif query:
-            expertise_match = MentorProfile.expertise.any(query)
+            expertise_blob = func.coalesce(
+                func.array_to_string(MentorProfile.expertise, " "),
+                "",
+            )
             email_match = User.email.ilike(f"%{query}%")
-            stmt = stmt.where(or_(expertise_match, email_match))
+            expertise_match = expertise_blob.ilike(f"%{query}%")
+            bio_match = func.coalesce(MentorProfile.bio, "").ilike(f"%{query}%")
+            stmt = stmt.where(or_(expertise_match, email_match, bio_match))
 
         results = (await self._session.execute(stmt)).all()
         return [
@@ -80,9 +87,16 @@ class SearchService:
         if user_id is not None:
             stmt = stmt.where(MenteeProfile.user_id == user_id)
         elif query:
-            goals_match = MenteeProfile.learning_goals.any(query)
+            goals_blob = func.coalesce(
+                func.array_to_string(MenteeProfile.learning_goals, " "),
+                "",
+            )
             email_match = User.email.ilike(f"%{query}%")
-            stmt = stmt.where(or_(goals_match, email_match))
+            goals_match = goals_blob.ilike(f"%{query}%")
+            edu_match = func.coalesce(MenteeProfile.education_level, "").ilike(
+                f"%{query}%"
+            )
+            stmt = stmt.where(or_(goals_match, email_match, edu_match))
 
         results = (await self._session.execute(stmt)).all()
         return [

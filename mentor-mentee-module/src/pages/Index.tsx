@@ -296,34 +296,53 @@ const Index = () => {
 
   const [searchQ, setSearchQ] = useState("");
   const debouncedSearchQ = useDebouncedValue(searchQ, 250);
+  /** API role: mentee dashboard searches mentors; mentor dashboard searches mentees. */
+  const searchApiRole = role === "mentee" ? "mentor" : "mentee";
   const { data: searchResults = [], isFetching: searchFetching, isError: searchApiError } =
-    useMentoringSearch(debouncedSearchQ, "mentor", 8);
+    useMentoringSearch(debouncedSearchQ, searchApiRole, 20);
 
   const searchMatches = useMemo(() => {
     const q = debouncedSearchQ.trim();
     if (!q) return [];
 
+    const displayName = (r: SearchResultItem) => {
+      const fromParts = [r.first_name, r.last_name]
+        .filter((x): x is string => x != null && String(x).trim().length > 0)
+        .map((x) => String(x).trim())
+        .join(" ");
+      if (fromParts) return fromParts;
+      if (r.full_name && String(r.full_name).trim()) return String(r.full_name).trim();
+      return r.user_id;
+    };
+
     const mapApi = (r: SearchResultItem): MatchProfile => {
+      const isMentor = r.role === "mentor";
       const tier = (r.tier ?? "PEER") as "PEER" | "PROFESSIONAL" | "EXPERT";
-      const sessionCostCredits =
-        typeof r.session_credit_cost === "number" && r.session_credit_cost > 0
+      const sessionCostCredits = isMentor
+        ? typeof r.session_credit_cost === "number" && r.session_credit_cost > 0
           ? r.session_credit_cost
           : tier === "EXPERT"
             ? 250
             : tier === "PROFESSIONAL"
               ? 100
-              : 50;
+              : 50
+        : 0;
+      const skills = r.expertise ?? [];
       return {
         id: r.user_id,
-        mentorUserId: r.user_id,
-        mentorProfileId: r.mentor_profile_id ?? undefined,
-        name: r.full_name ?? r.user_id,
+        mentorUserId: isMentor ? r.user_id : undefined,
+        mentorProfileId: isMentor ? (r.mentor_profile_id ?? r.user_id) : undefined,
+        name: displayName(r),
         avatar: "",
-        role: "mentor",
-        skills: r.expertise ?? [],
-        bio: r.expertise?.length
-          ? `Mentor skilled in ${r.expertise.slice(0, 3).join(", ")}.`
-          : "Mentor profile",
+        role: isMentor ? "mentor" : "mentee",
+        skills,
+        bio: isMentor
+          ? skills.length
+            ? `Mentor skilled in ${skills.slice(0, 3).join(", ")}.`
+            : "Mentor profile"
+          : skills.length
+            ? `Learning goals: ${skills.slice(0, 3).join(", ")}.`
+            : "Mentee profile",
         aiMatchScore: 90,
         tier,
         sessionCostCredits,
@@ -545,8 +564,13 @@ const Index = () => {
                 <Input
                   value={searchQ}
                   onChange={(e) => setSearchQ(e.target.value)}
-                  placeholder="Search mentors by name, skill, or user_id…"
+                  placeholder={
+                    role === "mentee"
+                      ? "Search mentors by name, expertise, bio, or user id…"
+                      : "Search mentees by name, learning goals, education, or user id…"
+                  }
                   className="h-9"
+                  aria-label={role === "mentee" ? "Search mentors" : "Search mentees"}
                 />
 
               </div>
@@ -594,7 +618,7 @@ const Index = () => {
                       key={match.id}
                       className="pl-2 md:pl-4 basis-full min-[520px]:basis-1/2"
                     >
-                      {showAiMentorCarousel ? (
+                      {role === "mentee" && match.role === "mentor" && token ? (
                         <AiMatchCard
                           match={match}
                           token={token}

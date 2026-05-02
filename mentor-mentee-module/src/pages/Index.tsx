@@ -39,7 +39,6 @@ import {
 import { mapAiRecommendationToMatchProfile } from "@/lib/mapAiRecommendation";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { toast } from "@/hooks/use-toast";
-import { fetchProfileFull } from "@/api/userService";
 import { fetchGamificationWallet } from "@/api/creditServiceApi";
 import {
   createDashboardGoal,

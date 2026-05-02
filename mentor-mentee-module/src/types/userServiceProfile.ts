@@ -1,4 +1,4 @@
-/** GET /profile/full from User Service */
+/** Shape returned by `fetchProfileFull` — sourced from User Service `GET /me` (mentor/mentee domain rows are null here). */
 export type UserServiceMentorProfile = {
   id: string;
   user_id: string;

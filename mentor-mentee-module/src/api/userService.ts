@@ -73,8 +73,21 @@ export function getUserServiceDashboardWsUrl(token: string): string {
   return u.toString();
 }
 
+type MeResponseJson = {
+  user: {
+    id: string;
+    email: string;
+    is_admin?: boolean;
+    roles?: string[];
+  };
+};
+
+/**
+ * Identity + `is_admin` from User Service `GET /me`.
+ * Domain profiles (mentor/mentee) live on the Mentoring API — this returns null for those.
+ */
 export async function fetchProfileFull(token: string): Promise<FullProfileResponse> {
-  const res = await fetch(`${getUserServiceBase()}/api/v1/profiles/full`, {
+  const res = await fetch(`${getUserServiceBase()}/me`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
@@ -84,5 +97,15 @@ export async function fetchProfileFull(token: string): Promise<FullProfileRespon
     const err = await res.text();
     throw new Error(err || `Profile fetch failed (${res.status})`);
   }
-  return res.json() as Promise<FullProfileResponse>;
+  const data = (await res.json()) as MeResponseJson;
+  const u = data.user;
+  const roles = u.roles ?? [];
+  const isAdmin = Boolean(u.is_admin ?? roles.includes("ADMIN"));
+  return {
+    user_id: String(u.id),
+    email: u.email,
+    is_admin: isAdmin,
+    mentor_profile: null,
+    mentee_profile: null,
+  };
 }

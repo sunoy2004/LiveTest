@@ -15,6 +15,32 @@ from app.services.book_mentor_session_credits import BOOK_MENTOR_SESSION_RULE_CO
 logger = logging.getLogger(__name__)
 
 
+def _parse_balance_from_payload(data: dict[str, Any]) -> int | None:
+    """Normalize gamification JSON (snake_case / camelCase / string numbers)."""
+    for key in (
+        "balance_after",
+        "balanceAfter",
+        "current_balance",
+        "currentBalance",
+        "balance",
+    ):
+        raw = data.get(key)
+        if raw is None or isinstance(raw, bool):
+            continue
+        if isinstance(raw, int):
+            return raw
+        if isinstance(raw, float):
+            return int(raw)
+        if isinstance(raw, str):
+            s = raw.strip()
+            if s.isdigit() or (s.startswith("-") and s[1:].isdigit()):
+                try:
+                    return int(s)
+                except ValueError:
+                    continue
+    return None
+
+
 async def fetch_wallet_balance_from_gamification(user_id: uuid.UUID) -> int | None:
     """
     GET {GAMIFICATION}/internal/wallet/{user_id} with X-Internal-Token.
@@ -41,13 +67,9 @@ async def fetch_wallet_balance_from_gamification(user_id: uuid.UUID) -> int | No
         return None
     try:
         data = resp.json()
-        raw = data.get("current_balance")
-        if isinstance(raw, bool):
-            return None
-        if isinstance(raw, int):
-            return max(0, raw)
-        if isinstance(raw, float):
-            return max(0, int(raw))
+        bal = _parse_balance_from_payload(data)
+        if bal is not None:
+            return max(0, bal)
     except Exception as exc:
         logger.warning("gamification wallet parse failed: %s", exc)
     return None
@@ -103,13 +125,18 @@ async def deduct_book_mentor_session_credits(
         ) from exc
 
     if resp.status_code == status.HTTP_200_OK:
-        data = resp.json()
-        raw = data.get("balance_after")
-        if isinstance(raw, int):
-            return raw
-        if isinstance(raw, float):
-            return int(raw)
-        logger.warning("gamification deduct missing balance_after: %s", data)
+        try:
+            data = resp.json()
+        except Exception as exc:
+            logger.warning("gamification deduct JSON parse failed: %s", exc)
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail="Invalid response from gamification service",
+            ) from exc
+        bal = _parse_balance_from_payload(data)
+        if bal is not None:
+            return bal
+        logger.warning("gamification deduct missing balance fields: %s", data)
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY,
             detail="Invalid response from gamification service",

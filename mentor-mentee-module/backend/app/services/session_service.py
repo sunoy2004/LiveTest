@@ -15,7 +15,10 @@ from app.models import SessionHistory
 from app.models import TimeSlot
 from app.models import User
 from app.services.book_mentor_session_credits import resolve_default_book_session_credits
-from app.services.gamification_transactions import deduct_book_mentor_session_credits
+from app.services.gamification_transactions import (
+    deduct_book_mentor_session_credits,
+    fetch_wallet_balance_from_gamification,
+)
 from app.services.upcoming_sessions_merge import list_merged_upcoming_sessions
 from app.utils.connection_token import mentoring_connection_token
 from app.utils.display_name import from_email
@@ -173,6 +176,12 @@ class SessionService:
         except HTTPException:
             await self._session.rollback()
             raise
+
+        # Re-read wallet from gamification so mentoring cache matches the ledger (deduct response
+        # shape can vary; this also confirms the spend was committed before we cache locally).
+        verified = await fetch_wallet_balance_from_gamification(mentee_id)
+        if verified is not None:
+            balance_after = verified
 
         profile = await self._session.get(MenteeProfile, mentee_id)
         if profile is not None:

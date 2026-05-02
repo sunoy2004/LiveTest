@@ -13,8 +13,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getMentorshipRequestsIncoming, putMentorshipRequestStatus } from "@/lib/api/mentoring";
+import { MentoringApiError } from "@/lib/api/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+
+/** GET /requests/incoming — mentor inbox; use sender_user_id for PUT /requests/{sender_user_id}/status */
+export interface IncomingMatchmakerRequestRow {
+  sender_user_id: string;
+  receiver_user_id: string;
+  status: string;
+  mentee_name: string;
+  intro_message?: string;
+}
+
+function describeApiError(e: unknown): string {
+  if (e instanceof MentoringApiError) return e.message;
+  if (e instanceof Error) return e.message;
+  return "Request failed";
+}
 
 interface IncomingMatchmakerRequestsPanelProps {
   token: string | null | undefined;
@@ -26,7 +42,7 @@ export default function IncomingMatchmakerRequestsPanel({
   enabled,
 }: IncomingMatchmakerRequestsPanelProps) {
   const queryClient = useQueryClient();
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<IncomingMatchmakerRequestRow | null>(null);
   
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["user-service", "mentoring", "incoming-matchmaker-requests", token],
@@ -45,7 +61,7 @@ export default function IncomingMatchmakerRequestsPanel({
     );
   }
 
-  const rows = (data as any[]) ?? [];
+  const rows = (data as IncomingMatchmakerRequestRow[]) ?? [];
   if (rows.length === 0) {
     return (
       <p className="text-center py-8 text-sm text-muted-foreground">
@@ -57,36 +73,38 @@ export default function IncomingMatchmakerRequestsPanel({
   const invalidateAfterDecision = () => {
     void queryClient.invalidateQueries({ queryKey: ["user-service", "mentoring"] });
     void queryClient.invalidateQueries({ queryKey: ["user-service", "dashboard"] });
+    void queryClient.invalidateQueries({ queryKey: ["user-service", "dashboard", "stats"] });
+    void queryClient.invalidateQueries({ queryKey: ["mentoring", "connected-mentors"] });
   };
 
-  const handleReject = (r: any) => {
+  const handleReject = (r: IncomingMatchmakerRequestRow) => {
     void (async () => {
       try {
-        await putMentorshipRequestStatus(r.id, { status: "DECLINED" });
+        await putMentorshipRequestStatus(r.sender_user_id, { status: "DECLINED" });
         toast({ title: "Request declined" });
-        setDetail((d: any) => (d?.id === r.id ? null : d));
+        setDetail((d) => (d?.sender_user_id === r.sender_user_id ? null : d));
         invalidateAfterDecision();
       } catch (e) {
         toast({
           title: "Could not reject",
-          description: e instanceof Error ? e.message : "Request failed",
+          description: describeApiError(e),
           variant: "destructive",
         });
       }
     })();
   };
 
-  const handleAccept = (r: any) => {
+  const handleAccept = (r: IncomingMatchmakerRequestRow) => {
     void (async () => {
       try {
-        await putMentorshipRequestStatus(r.id, { status: "ACCEPTED" });
+        await putMentorshipRequestStatus(r.sender_user_id, { status: "ACCEPTED" });
         toast({ title: "Connection accepted", description: "You are now connected." });
-        setDetail((d: any) => (d?.id === r.id ? null : d));
+        setDetail((d) => (d?.sender_user_id === r.sender_user_id ? null : d));
         invalidateAfterDecision();
       } catch (e) {
         toast({
           title: "Could not accept",
-          description: e instanceof Error ? e.message : "Request failed",
+          description: describeApiError(e),
           variant: "destructive",
         });
       }
@@ -98,12 +116,16 @@ export default function IncomingMatchmakerRequestsPanel({
       <div className="space-y-2">
         {rows.map((r) => (
           <div
-            key={r.id}
+            key={r.sender_user_id}
             className="flex flex-col gap-3 rounded-xl border border-border bg-card/50 p-3 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">{r.mentee_name}</p>
-              <p className="text-xs text-muted-foreground line-clamp-1 italic text-ellipsis">"{r.intro_message}"</p>
+              <p className="text-xs text-muted-foreground line-clamp-2 italic text-ellipsis">
+                {(r.intro_message ?? "").trim()
+                  ? `“${(r.intro_message ?? "").trim()}”`
+                  : "No introduction message."}
+              </p>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:max-w-xl sm:flex-row sm:flex-wrap sm:justify-end">
               <Button
@@ -180,7 +202,9 @@ export default function IncomingMatchmakerRequestsPanel({
                       Introduction Message
                     </dt>
                     <dd className="mt-1 text-foreground whitespace-pre-wrap rounded-md bg-muted/50 p-3 italic">
-                      "{detail.intro_message}"
+                      {(detail.intro_message ?? "").trim()
+                        ? `“${(detail.intro_message ?? "").trim()}”`
+                        : "No introduction message was provided."}
                     </dd>
                   </div>
                 </dl>

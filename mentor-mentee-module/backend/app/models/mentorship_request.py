@@ -10,7 +10,9 @@ if TYPE_CHECKING:
 
 
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, String
+from sqlalchemy import DateTime, String, Text, text
+
+from app.constants.mentorship_request import DEFAULT_INTRO_MESSAGE
 
 class MentorshipRequest(Base):
     __tablename__ = "mentorship_requests"
@@ -29,6 +31,12 @@ class MentorshipRequest(Base):
         String(32),
         nullable=True,
         default="PENDING",
+    )
+    intro_message: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default=DEFAULT_INTRO_MESSAGE,
+        server_default=text("'I''d like to request a mentorship connection with you.'"),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

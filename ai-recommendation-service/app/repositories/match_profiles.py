@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -7,6 +8,19 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.vector_utils import to_pgvector_literal
+
+log = logging.getLogger(__name__)
+
+# Exclude mentors the mentee already has a live mentorship with (same DB as match_profiles).
+_EXCLUDE_CONNECTED = """
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM mentorship_connections mc
+                    WHERE mc.mentee_user_id = :user_id
+                      AND mc.mentor_user_id = target.user_id
+                      AND mc.status IN ('ACTIVE', 'PENDING')
+                  )
+"""
 
 
 class MatchProfileRepository:
@@ -64,6 +78,27 @@ class MatchProfileRepository:
         )
         return r.first() is not None
 
+    async def connected_mentor_user_ids_for_mentee(
+        self, *, mentee_user_id: uuid.UUID
+    ) -> set[str]:
+        """Mentor user_ids that already have an ACTIVE or PENDING connection with this mentee."""
+        try:
+            r = await self._session.execute(
+                text(
+                    """
+                    SELECT mentor_user_id::text
+                    FROM mentorship_connections
+                    WHERE mentee_user_id = :mid
+                      AND status IN ('ACTIVE', 'PENDING')
+                    """
+                ),
+                {"mid": mentee_user_id},
+            )
+            return {row[0] for row in r.fetchall()}
+        except Exception as e:
+            log.warning("connected_mentor_user_ids_for_mentee failed: %s", e)
+            return set()
+
     async def recommend(
         self,
         *,
@@ -97,6 +132,9 @@ class MatchProfileRepository:
                     WHERE source_user_id = :user_id
                       AND interaction_type = 'REJECTED_SUGGESTION'
                   )
+"""
+                + _EXCLUDE_CONNECTED
+                + """
                 ORDER BY target.embedding <=> source.embedding
                 LIMIT :limit
                 """
@@ -142,6 +180,9 @@ class MatchProfileRepository:
                     WHERE source_user_id = :user_id
                       AND interaction_type = 'REJECTED_SUGGESTION'
                   )
+"""
+                + _EXCLUDE_CONNECTED
+                + """
                 ORDER BY final_rank DESC, target.embedding <=> source.embedding
                 LIMIT :limit
                 """

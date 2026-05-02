@@ -28,7 +28,14 @@ class RecommendationService:
         if s.recommendation_engine == "graph":
             from app.services.graph import graph_store
 
-            rows = graph_store.recommend(user_id=user_id, limit=limit)
+            uid = uuid.UUID(user_id)
+            blocked = await self._repo.connected_mentor_user_ids_for_mentee(
+                mentee_user_id=uid
+            )
+            raw = graph_store.recommend(user_id=user_id, limit=max(limit * 5, limit))
+            rows = [r for r in raw if str(r.get("mentor_id", "")) not in blocked][
+                :limit
+            ]
             return enrich_recommendation_rows(rows, snap)
 
         uid = uuid.UUID(user_id)

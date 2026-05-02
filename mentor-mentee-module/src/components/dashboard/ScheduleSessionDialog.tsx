@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { AlertCircle, CalendarIcon, Clock, Coins, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -83,15 +84,25 @@ const ScheduleSessionDialog = ({
   const [time, setTime] = useState("");
   const [partner, setPartner] = useState("");
   const [topic, setTopic] = useState("");
-  const [connectedMentors, setConnectedMentors] = useState<ConnectedMentorItem[]>([]);
   const [selectedMentor, setSelectedMentor] = useState<ConnectedMentorItem | null>(null);
   const [availableSlots, setAvailableSlots] = useState<AvailableSlotItem[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<AvailableSlotItem | null>(null);
-  const [loadingMentors, setLoadingMentors] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const useLiveSchedule = role === "mentee" && Boolean(token);
+
+  const {
+    data: connectedMentors = [],
+    isFetching: loadingMentors,
+    isError: mentorsError,
+    error: mentorsErr,
+  } = useQuery({
+    queryKey: ["mentoring", "connected-mentors", token],
+    queryFn: () => fetchConnectedMentors(token!),
+    enabled: Boolean(open && role === "mentee" && token),
+    staleTime: 15_000,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -99,33 +110,27 @@ const ScheduleSessionDialog = ({
     setTime("");
     setPartner("");
     setTopic("");
-    setConnectedMentors([]);
     setSelectedMentor(null);
     setAvailableSlots([]);
     setSelectedSlot(null);
-    setLoadingMentors(false);
     setLoadingSlots(false);
     setSubmitting(false);
   }, [open]);
 
   useEffect(() => {
-    if (!open || role !== "mentee" || !token) return;
-    setLoadingMentors(true);
-    fetchConnectedMentors(token)
-      .then((rows) => {
-        setConnectedMentors(rows);
-        if (rows.length === 1) {
-          setSelectedMentor(rows[0]);
-        }
-      })
-      .catch((e) => {
-        toast({
-          title: "Could not load mentors",
-          description: e instanceof Error ? e.message.slice(0, 280) : "Request failed",
-        });
-      })
-      .finally(() => setLoadingMentors(false));
-  }, [open, role, token]);
+    if (!open || role !== "mentee") return;
+    if (connectedMentors.length === 1) {
+      setSelectedMentor(connectedMentors[0]);
+    }
+  }, [open, role, connectedMentors]);
+
+  useEffect(() => {
+    if (!selectedMentor) return;
+    const still = connectedMentors.some(
+      (c) => c.connection_id === selectedMentor.connection_id,
+    );
+    if (!still) setSelectedMentor(null);
+  }, [connectedMentors, selectedMentor]);
 
   useEffect(() => {
     if (!open || role !== "mentee" || !token || !selectedMentor) return;
@@ -242,6 +247,11 @@ const ScheduleSessionDialog = ({
             </TooltipProvider>
             <div className="grid gap-2">
               <Label>Mentor</Label>
+              {mentorsError && (
+                <p className="text-xs text-destructive">
+                  {mentorsErr instanceof Error ? mentorsErr.message.slice(0, 240) : "Could not load mentors."}
+                </p>
+              )}
               <Select
                 value={selectedMentor?.connection_id ?? ""}
                 onValueChange={(v) => {

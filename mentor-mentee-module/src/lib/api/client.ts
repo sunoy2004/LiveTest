@@ -14,6 +14,27 @@ function readShellAuthHeaders(): { token: string | null; userId: string | null }
   }
 }
 
+function formatMentoringErrorDetail(parsed: unknown, fallback: string): string {
+  if (typeof parsed !== "object" || !parsed || !("detail" in parsed)) {
+    return fallback || "Request failed";
+  }
+  const d = (parsed as { detail?: unknown }).detail;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d)) {
+    return d
+      .map((item) => {
+        if (typeof item === "object" && item && "msg" in item) {
+          return String((item as { msg?: unknown }).msg ?? "");
+        }
+        return JSON.stringify(item);
+      })
+      .filter(Boolean)
+      .join("; ");
+  }
+  if (d != null) return JSON.stringify(d);
+  return fallback || "Request failed";
+}
+
 export class MentoringApiError extends Error {
   constructor(
     message: string,
@@ -73,13 +94,8 @@ export async function mentoringJson<T>(
     parsed = text;
   }
   if (!res.ok) {
-    throw new MentoringApiError(
-      typeof parsed === "object" && parsed && "detail" in (parsed as object)
-        ? String((parsed as { detail?: string }).detail)
-        : res.statusText || "Request failed",
-      res.status,
-      parsed,
-    );
+    const msg = formatMentoringErrorDetail(parsed, res.statusText);
+    throw new MentoringApiError(msg, res.status, parsed);
   }
   return parsed as T;
 }

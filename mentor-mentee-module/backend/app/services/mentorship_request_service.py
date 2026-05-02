@@ -22,8 +22,14 @@ from app.models.enums import (
     MentorshipRequestStatus,
 )
 from app.schemas.request import MentorshipRequestCreate, MentorshipRequestStatusUpdate
+from app.constants.mentorship_request import DEFAULT_INTRO_MESSAGE
 
 TOPIC_MENTORING_CONNECTIONS = "mentoring.connections.events"
+
+
+def _resolved_intro_message(raw: str | None) -> str:
+    s = (raw or "").strip()
+    return s if s else DEFAULT_INTRO_MESSAGE
 
 
 def _ensure_mentorship_allowed(mentee: MenteeProfile) -> None:
@@ -70,10 +76,12 @@ class MentorshipRequestService:
                 detail="A pending request already exists",
             )
 
+        pitch = _resolved_intro_message(body.intro_message)
         req = MentorshipRequest(
             sender_user_id=mentee_user_id,
             receiver_user_id=body.mentor_id,
             status=MentorshipRequestStatus.PENDING,
+            intro_message=pitch,
         )
         self._session.add(req)
         try:
@@ -99,11 +107,13 @@ class MentorshipRequestService:
         results = (await self._session.execute(stmt)).all()
         out = []
         for req, email in results:
+            intro = getattr(req, "intro_message", None) or ""
             d = {
                 "sender_user_id": str(req.sender_user_id),
                 "receiver_user_id": str(req.receiver_user_id),
                 "status": req.status,
                 "mentee_name": from_email(email),
+                "intro_message": intro,
             }
             out.append(d)
         return out

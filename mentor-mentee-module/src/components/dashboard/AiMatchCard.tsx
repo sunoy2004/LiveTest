@@ -22,6 +22,7 @@ import { MentoringApiError } from "@/lib/api/client";
 import { toast } from "@/hooks/use-toast";
 import { qk } from "@/hooks/useMentoringQueries";
 import { fetchMentorProfileDetail } from "@/api/userServiceMentoringApi";
+import { DEFAULT_MENTORSHIP_INTRO_MESSAGE } from "@/constants/mentorshipRequest";
 
 const tierConfig: Record<
   MentorTierId,
@@ -38,13 +39,11 @@ type Props = {
   requestLocked?: boolean;
 };
 
-const DEFAULT_INTRO = "I'd like to request a mentorship connection with you.";
-
 const AiMatchCard = ({ match, token, requestLocked }: Props) => {
   const qc = useQueryClient();
   const [profileOpen, setProfileOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
-  const [intro, setIntro] = useState(DEFAULT_INTRO);
+  const [intro, setIntro] = useState(DEFAULT_MENTORSHIP_INTRO_MESSAGE);
   const [busy, setBusy] = useState<"connect" | "reject" | null>(null);
 
   const tier = tierConfig[match.tier];
@@ -101,11 +100,11 @@ const AiMatchCard = ({ match, token, requestLocked }: Props) => {
     try {
       await postMentorshipRequest({
         mentor_id: mentorProfileId,
-        intro_message: intro.trim() || DEFAULT_INTRO,
+        intro_message: intro.trim() || DEFAULT_MENTORSHIP_INTRO_MESSAGE,
       });
       toast({ title: "Request sent", description: "The mentor will see your introduction." });
       setConnectOpen(false);
-      setIntro(DEFAULT_INTRO);
+      setIntro(DEFAULT_MENTORSHIP_INTRO_MESSAGE);
       invalidateAi();
       void qc.invalidateQueries({ queryKey: ["user-service", "mentoring"] });
     } catch (e) {

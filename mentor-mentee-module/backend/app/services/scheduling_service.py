@@ -14,6 +14,7 @@ from app.models import (
     User,
 )
 from app.services.book_mentor_session_credits import resolve_default_book_session_credits
+from app.services.gamification_transactions import fetch_wallet_balance_from_gamification
 from app.utils.connection_token import mentoring_connection_token
 from app.utils.display_name import from_email
 
@@ -204,6 +205,24 @@ class SchedulingService:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Slot not found")
         if slot.is_booked:
             raise HTTPException(status.HTTP_409_CONFLICT, "Slot is no longer available")
+
+        required_credits = await self._default_booking_credits()
+        if required_credits < 1:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Session booking credit amount is not configured",
+            )
+        balance = await fetch_wallet_balance_from_gamification(mentee_user_id)
+        if balance is None:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Could not verify your credit balance. Try again shortly.",
+            )
+        if balance < required_credits:
+            raise HTTPException(
+                status.HTTP_402_PAYMENT_REQUIRED,
+                f"Insufficient credits to request this session: need {required_credits}, have {balance}",
+            )
 
         booking = SessionBookingRequest(
             mentor_user_id=match.mentor_user_id,

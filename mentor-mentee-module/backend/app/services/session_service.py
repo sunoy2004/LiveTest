@@ -116,13 +116,6 @@ class SessionService:
         if mentee_id is None:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Booking has no mentee")
 
-        idempotency_key = f"mentoring_booking_accept:{request_id}"
-        balance_after = await deduct_book_mentor_session_credits(
-            mentee_user_id=mentee_id,
-            amount=credit_amount,
-            idempotency_key=idempotency_key,
-        )
-
         end_dt = req.requested_time + timedelta(hours=1)
         if slot and slot.end_time:
             end_dt = slot.end_time
@@ -158,6 +151,27 @@ class SessionService:
         if slot:
             slot.is_booked = True
 
+        # Validate DB constraints before charging gamification (deduct is not rolled back with SQL).
+        try:
+            await self._session.flush()
+        except IntegrityError as e:
+            await self._session.rollback()
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail="Could not create the session row. Apply mentoring Alembic migrations (e.g. 005_sessions_align, 006_sessions_conn_slot) so sessions has required columns.",
+            ) from e
+
+        idempotency_key = f"mentoring_booking_accept:{request_id}"
+        try:
+            balance_after = await deduct_book_mentor_session_credits(
+                mentee_user_id=mentee_id,
+                amount=credit_amount,
+                idempotency_key=idempotency_key,
+            )
+        except HTTPException:
+            await self._session.rollback()
+            raise
+
         profile = await self._session.get(MenteeProfile, mentee_id)
         if profile is not None:
             profile.cached_credit_score = balance_after
@@ -168,7 +182,7 @@ class SessionService:
             await self._session.rollback()
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
-                detail="Could not create the session row. Ensure Alembic migration 005_sessions_align has been applied.",
+                detail="Could not finalize the session. Check mentoring DB schema and migrations.",
             ) from e
         await self._session.refresh(new_sess)
         st = new_sess.start_time

@@ -2,12 +2,13 @@ import uuid
 from datetime import timedelta
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_, select, text
-from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
+from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import MenteeProfile
 from app.models import MentorTier
+from app.models import MentorshipConnection
 from app.models import Session as MentorshipSession
 from app.models import SessionBookingRequest
 from app.models import SessionHistory
@@ -120,22 +121,23 @@ class SessionService:
         if slot and slot.end_time:
             end_dt = slot.end_time
 
-        connection_uuid: uuid.UUID | None = None
-        try:
-            res = await self._session.execute(
-                text(
-                    """
-                    SELECT connection_id FROM mentorship_connections
-                    WHERE mentor_user_id = :mid AND mentee_user_id = :meid
-                      AND UPPER(TRIM(COALESCE(status, ''))) = 'ACTIVE'
-                    LIMIT 1
-                    """
-                ),
-                {"mid": req.mentor_user_id, "meid": req.mentee_user_id},
+        # Do not query mentorship_connections.connection_id via raw SQL: many DBs use a
+        # composite PK only (no connection_id column). A failed SELECT aborts the whole
+        # transaction and the next INSERT raises InFailedSQLTransactionError.
+        active_conn = await self._session.scalar(
+            select(MentorshipConnection).where(
+                MentorshipConnection.mentor_user_id == req.mentor_user_id,
+                MentorshipConnection.mentee_user_id == req.mentee_user_id,
+                func.upper(func.trim(func.coalesce(MentorshipConnection.status, ""))) == "ACTIVE",
             )
-            connection_uuid = res.scalar_one_or_none()
-        except (ProgrammingError, DBAPIError):
-            connection_uuid = None
+        )
+        if active_conn is None:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail="No active mentorship connection for this booking",
+            )
+        # sessions.connection_id is optional (nullable); composite-key schemas have no UUID on connections.
+        connection_uuid: uuid.UUID | None = None
 
         new_sess = MentorshipSession(
             mentor_user_id=req.mentor_user_id,

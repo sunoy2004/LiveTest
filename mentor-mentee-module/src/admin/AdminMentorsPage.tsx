@@ -12,13 +12,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { fetchAdminMentors, putAdminMentorPricing, type AdminMentorRow } from "@/api/adminApi";
+import {
+  fetchAdminMentors,
+  putAdminMentorPricing,
+  type AdminMentorRow,
+  type MentorTierId,
+} from "@/api/adminApi";
 import { useMentorShellAuth } from "@/context/MentorShellAuthContext";
 import { toast } from "@/hooks/use-toast";
 import { useEffect, useMemo, useState } from "react";
 import { matchesAdminSearch } from "@/lib/utils";
 
-const TIERS = ["TIER_1", "TIER_2", "TIER_3"] as const;
+const TIERS: readonly MentorTierId[] = ["PEER", "PROFESSIONAL", "EXPERT"];
+
+function normalizeTier(raw: string): MentorTierId {
+  const u = (raw || "").toUpperCase().trim();
+  if (u === "PEER" || u === "PROFESSIONAL" || u === "EXPERT") return u;
+  if (u === "TIER_1") return "PEER";
+  if (u === "TIER_2") return "PROFESSIONAL";
+  if (u === "TIER_3") return "EXPERT";
+  return "PEER";
+}
 
 function MentorPricingRow({
   row,
@@ -29,34 +43,21 @@ function MentorPricingRow({
   token: string;
   onSaved: () => void;
 }) {
-  const [tier, setTier] = useState<(typeof TIERS)[number]>(
-    TIERS.includes(row.tier as (typeof TIERS)[number]) ? (row.tier as (typeof TIERS)[number]) : "TIER_2",
-  );
-  const [sessionPrice, setSessionPrice] = useState(
-    row.base_credit_override != null ? String(row.base_credit_override) : "",
-  );
+  const [tier, setTier] = useState<MentorTierId>(normalizeTier(row.tier));
 
   useEffect(() => {
-    setTier(TIERS.includes(row.tier as (typeof TIERS)[number]) ? (row.tier as (typeof TIERS)[number]) : "TIER_2");
-    setSessionPrice(row.base_credit_override != null ? String(row.base_credit_override) : "");
+    setTier(normalizeTier(row.tier));
   }, [row]);
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      let base_credit_override: number | null = null;
-      const t = sessionPrice.trim();
-      if (t !== "") {
-        const n = Number.parseInt(t, 10);
-        if (!Number.isFinite(n) || n < 1) {
-          throw new Error("Session price must be a whole number ≥ 1, or leave empty to use the tier default.");
-        }
-        base_credit_override = n;
-      }
-      return putAdminMentorPricing(token, row.id, { tier, base_credit_override });
-    },
+    mutationFn: async () =>
+      putAdminMentorPricing(token, row.id, {
+        tier,
+        base_credit_override: null,
+      }),
     onSuccess: () => {
       onSaved();
-      toast({ title: "Mentor pricing saved" });
+      toast({ title: "Mentor tier saved" });
     },
     onError: (err) => {
       toast({
@@ -73,13 +74,13 @@ function MentorPricingRow({
       <TableCell className="text-muted-foreground">{row.email}</TableCell>
       <TableCell>
         <Label className="sr-only" htmlFor={`tier-${row.id}`}>
-          Mentor level
+          Mentor tier
         </Label>
         <select
           id={`tier-${row.id}`}
-          className="flex h-9 w-full min-w-[7rem] rounded-md border border-input bg-background px-2 text-sm"
+          className="flex h-9 w-full min-w-[10rem] rounded-md border border-input bg-background px-2 text-sm"
           value={tier}
-          onChange={(e) => setTier(e.target.value as (typeof TIERS)[number])}
+          onChange={(e) => setTier(e.target.value as MentorTierId)}
         >
           {TIERS.map((x) => (
             <option key={x} value={x}>
@@ -87,20 +88,6 @@ function MentorPricingRow({
             </option>
           ))}
         </select>
-      </TableCell>
-      <TableCell>
-        <Label className="sr-only" htmlFor={`price-${row.id}`}>
-          Session price credits
-        </Label>
-        <Input
-          id={`price-${row.id}`}
-          type="number"
-          min={1}
-          placeholder="Tier default"
-          className="h-9 max-w-[9rem]"
-          value={sessionPrice}
-          onChange={(e) => setSessionPrice(e.target.value)}
-        />
       </TableCell>
       <TableCell className="text-right">
         <Button type="button" size="sm" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
@@ -125,9 +112,7 @@ export default function AdminMentorsPage() {
 
   const filtered = useMemo(() => {
     const rows = q.data ?? [];
-    return rows.filter((m) =>
-      matchesAdminSearch(search, m.name, m.email, m.tier, m.base_credit_override),
-    );
+    return rows.filter((m) => matchesAdminSearch(search, m.name, m.email, m.tier));
   }, [q.data, search]);
 
   return (
@@ -146,22 +131,22 @@ export default function AdminMentorsPage() {
               </button>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs border-border">
-              Admins can configure mentor pricing here. All payments are handled via the gamification system.
+              Session booking costs use mentor tier (`mentor_tiers.session_credit_cost`) and gamification rules. Wallet
+              balances are separate.
             </TooltipContent>
           </Tooltip>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          <strong className="text-foreground">Mentor level</strong> (TIER_1–3) sets the default session price from
-          tier rules. <strong className="text-foreground">Session price (credits)</strong> overrides that amount for
-          bookings with this mentor only — it is not a wallet balance.
+          <strong className="text-foreground">Mentor tier</strong> (PEER, PROFESSIONAL, EXPERT) maps to pricing in the
+          mentoring database and gamification booking actions.
         </p>
       </div>
 
       <div className="flex gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
         <p>
-          This sets the price for booking a session with each mentor. Wallet credits are managed by the gamification
-          service.
+          Tier changes apply to this mentor&apos;s profile immediately. Per-session credit overrides are not stored yet;
+          cost follows tier defaults.
         </p>
       </div>
 
@@ -173,7 +158,7 @@ export default function AdminMentorsPage() {
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input
           type="search"
-          placeholder="Search by name, email, mentor level, or session price…"
+          placeholder="Search by name, email, or tier…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="bg-background pl-9"
@@ -189,31 +174,30 @@ export default function AdminMentorsPage() {
               <TableHead>Email</TableHead>
               <TableHead>
                 <span className="inline-flex items-center gap-1">
-                  Mentor level
+                  Tier
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="cursor-help text-muted-foreground">
                         <HelpCircle className="h-3.5 w-3.5" />
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>TIER_1 / TIER_2 / TIER_3 — default band before session price override.</TooltipContent>
+                    <TooltipContent>PEER / PROFESSIONAL / EXPERT — matches `mentor_tiers`.</TooltipContent>
                   </Tooltip>
                 </span>
               </TableHead>
-              <TableHead>Session price (credits)</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(q.data ?? []).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={4} className="text-muted-foreground">
                   No mentor profiles found. Create mentor accounts via User Service / seed data.
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={4} className="text-muted-foreground">
                   No mentors match your search.
                 </TableCell>
               </TableRow>

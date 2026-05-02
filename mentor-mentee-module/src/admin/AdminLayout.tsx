@@ -30,8 +30,8 @@ export default function AdminLayout() {
           <h1 className="text-xl font-semibold tracking-tight text-foreground">Admin</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Mentor session pricing and directory. User wallets and ledger balances are managed by the gamification
-          service — not here.
+          Mentor tiers (PEER / PROFESSIONAL / EXPERT), connections, sessions, and disputes from the mentoring service.
+          Wallets and ledger balances are managed by gamification — not here.
         </p>
       </header>
 

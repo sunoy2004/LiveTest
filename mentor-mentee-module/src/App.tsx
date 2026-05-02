@@ -10,6 +10,7 @@ import { MentorShellAuthProvider } from "@/context/MentorShellAuthContext";
 import type { ShellUser } from "@/types/shellAuth";
 import AdminAccess from "./admin/AdminAccess.tsx";
 import AdminLayout from "./admin/AdminLayout.tsx";
+import AdminConnectionsPage from "./admin/AdminConnectionsPage.tsx";
 import AdminDisputesPage from "./admin/AdminDisputesPage.tsx";
 import AdminMenteesPage from "./admin/AdminMenteesPage.tsx";
 import AdminMentorsPage from "./admin/AdminMentorsPage.tsx";
@@ -37,6 +38,7 @@ function StandaloneRoutes() {
         <Route index element={<Navigate to="mentors" replace />} />
         <Route path="mentors" element={<AdminMentorsPage />} />
         <Route path="mentees" element={<AdminMenteesPage />} />
+        <Route path="connections" element={<AdminConnectionsPage />} />
         <Route path="sessions" element={<AdminSessionsPage />} />
         <Route path="disputes" element={<AdminDisputesPage />} />
       </Route>

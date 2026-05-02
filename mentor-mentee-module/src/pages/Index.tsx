@@ -289,10 +289,10 @@ const Index = () => {
       activeSessions: s.active_sessions,
       partnersSub:
         s.active_partners === 0
-          ? "No active mentorships"
+          ? "No active connections"
           : s.active_partners === 1
-            ? "1 active mentorship"
-            : `${s.active_partners} active mentorships`,
+            ? "1 active connection"
+            : `${s.active_partners} active connections`,
     };
   }, [token, role, statsLoading, statsRes]);
 
@@ -430,7 +430,7 @@ const Index = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={Users}
-          label={role === "mentee" ? "Active Mentors" : "Active Mentees"}
+          label="Active Connections"
           value={statCards.activePartners}
           subtitle={statCards.partnersSub}
           index={0}

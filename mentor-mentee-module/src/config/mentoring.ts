@@ -102,7 +102,7 @@ export const mentoringPaths = {
     `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/requests/${encodeURIComponent(requestId)}/status`,
   sessionHistory: (sessionId: string) =>
     `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/sessions/${encodeURIComponent(sessionId)}/history`,
-  /** User Service admin surface (not under mentoring prefix); use with `VITE_USER_SERVICE_URL`. */
+  /** Relative path fragments under `${MENTORING_API_PREFIX}/admin` (use with `getMentoringDomainBaseUrl()`). */
   adminTier: (tierId: string) => `/admin/tiers/${encodeURIComponent(tierId)}`,
   adminRevokeConsent: (menteeId: string) =>
     `/admin/profiles/${encodeURIComponent(menteeId)}/revoke-consent`,

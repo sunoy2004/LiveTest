@@ -193,8 +193,8 @@ const Index = () => {
 
   const mentee = profile.mentee_profile;
   const usMentee = profile.mentee_profile;
-  const fallbackCredits =
-    usMentee != null ? usMentee.cached_credit_score : (mentee?.cached_credit_score ?? 100);
+  const profileCreditFallback =
+    usMentee != null ? usMentee.cached_credit_score : (mentee?.cached_credit_score ?? 0);
 
   const { data: walletRes } = useQuery({
     queryKey: ["gamification", "wallet", "me", token],
@@ -203,7 +203,8 @@ const Index = () => {
     staleTime: 15_000,
     refetchInterval: 10_000,
   });
-  const credits = walletRes?.current_balance ?? fallbackCredits;
+  /** Gamification wallet first; fall back to mentoring profile cache (synced from gamification on /profiles/me). */
+  const credits = walletRes?.current_balance ?? profileCreditFallback;
 
 
   /** Workflow 1 — POST /requests → 403 until guardian consent (DPDP). */

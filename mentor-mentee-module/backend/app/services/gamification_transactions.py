@@ -15,6 +15,44 @@ from app.services.book_mentor_session_credits import BOOK_MENTOR_SESSION_RULE_CO
 logger = logging.getLogger(__name__)
 
 
+async def fetch_wallet_balance_from_gamification(user_id: uuid.UUID) -> int | None:
+    """
+    GET {GAMIFICATION}/internal/wallet/{user_id} with X-Internal-Token.
+    Returns current_balance, or None if misconfigured / unreachable / error.
+    """
+    settings = get_settings()
+    base = (settings.gamification_service_url or "").strip().rstrip("/")
+    token = (settings.internal_api_token or "").strip()
+    if not base or not token:
+        return None
+    url = f"{base}/internal/wallet/{user_id}"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers={"X-Internal-Token": token})
+    except httpx.RequestError as exc:
+        logger.warning("gamification wallet fetch failed: %s", exc)
+        return None
+    if resp.status_code != status.HTTP_200_OK:
+        logger.warning(
+            "gamification wallet HTTP %s: %s",
+            resp.status_code,
+            (resp.text or "")[:200],
+        )
+        return None
+    try:
+        data = resp.json()
+        raw = data.get("current_balance")
+        if isinstance(raw, bool):
+            return None
+        if isinstance(raw, int):
+            return max(0, raw)
+        if isinstance(raw, float):
+            return max(0, int(raw))
+    except Exception as exc:
+        logger.warning("gamification wallet parse failed: %s", exc)
+    return None
+
+
 async def deduct_book_mentor_session_credits(
     *,
     mentee_user_id: uuid.UUID,

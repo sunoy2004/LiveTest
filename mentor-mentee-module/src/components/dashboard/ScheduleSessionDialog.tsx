@@ -46,7 +46,7 @@ interface ScheduleSessionDialogProps {
   onOpenChange: (open: boolean) => void;
   role: "mentor" | "mentee";
   token?: string | null;
-  /** mentee_profiles.cached_credit_score from User Service (YANC wallet). */
+  /** Gamification wallet balance for mentee scheduling UI. */
   cachedCreditScore?: number;
 }
 

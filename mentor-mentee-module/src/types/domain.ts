@@ -38,6 +38,7 @@ export interface MentoringProfileMeResponse {
     education_level: string;
     is_minor: boolean;
     guardian_consent_status: GuardianConsentStatus;
+    /** Mirrored from gamification wallet; mentoring DB cache updated on GET /profiles/me. */
     cached_credit_score: number;
   };
   mentor_profile?: {

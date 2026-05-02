@@ -8,7 +8,8 @@ export type SchedulingSlot = {
 export type BookingSchedulingContext = {
   connection_id: string;
   mentor_display_name: string;
-  cached_credit_score: number;
+  /** @deprecated Prefer gamification wallet; optional for legacy responses. */
+  cached_credit_score?: number;
   slots: SchedulingSlot[];
 };
 

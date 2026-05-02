@@ -34,7 +34,7 @@ interface BookingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   match: MatchProfile | null;
-  /** Overrides mock wallet — use mentee cached_credit_score from profiles/me */
+  /** Gamification wallet balance (or mock) for credit checks in the dialog. */
   cachedCreditScore?: number;
   /** User Service scheduling context (mentee + active connection). */
   bookingContext?: BookingSchedulingContext | null;
@@ -76,7 +76,7 @@ const BookingDialog = ({
   if (!match) return null;
 
   const walletBalance = useLiveBooking
-    ? (bookingContext!.cached_credit_score)
+    ? (bookingContext!.cached_credit_score ?? cachedCreditScore ?? 0)
     : (cachedCreditScore ?? creditWallet.balance);
 
   const mentorLabel = useLiveBooking ? bookingContext!.mentor_display_name : match.name;

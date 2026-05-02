@@ -24,6 +24,7 @@ class MenteeProfileRead(BaseModel):
     last_name: str | None = None
     learning_goals: list[str] = []
     education_level: str | None = None
+    cached_credit_score: int = 0
 
 class MentorProfileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)

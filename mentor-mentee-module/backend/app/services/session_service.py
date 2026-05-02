@@ -2,7 +2,8 @@ import uuid
 from datetime import timedelta
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
+from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import MenteeProfile
@@ -126,12 +127,31 @@ class SessionService:
         if slot and slot.end_time:
             end_dt = slot.end_time
 
+        connection_uuid: uuid.UUID | None = None
+        try:
+            res = await self._session.execute(
+                text(
+                    """
+                    SELECT connection_id FROM mentorship_connections
+                    WHERE mentor_user_id = :mid AND mentee_user_id = :meid
+                      AND UPPER(TRIM(COALESCE(status, ''))) = 'ACTIVE'
+                    LIMIT 1
+                    """
+                ),
+                {"mid": req.mentor_user_id, "meid": req.mentee_user_id},
+            )
+            connection_uuid = res.scalar_one_or_none()
+        except (ProgrammingError, DBAPIError):
+            connection_uuid = None
+
         new_sess = MentorshipSession(
             mentor_user_id=req.mentor_user_id,
             mentee_user_id=req.mentee_user_id,
             start_time=req.requested_time,
             end_time=end_dt,
             status="SCHEDULED",
+            connection_id=connection_uuid,
+            slot_id=slot.id if slot else None,
         )
         self._session.add(new_sess)
         req.status = "APPROVED"
@@ -142,7 +162,14 @@ class SessionService:
         if profile is not None:
             profile.cached_credit_score = balance_after
 
-        await self._session.commit()
+        try:
+            await self._session.commit()
+        except IntegrityError as e:
+            await self._session.rollback()
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail="Could not create the session row. Ensure Alembic migration 005_sessions_align has been applied.",
+            ) from e
         await self._session.refresh(new_sess)
         st = new_sess.start_time
         return {

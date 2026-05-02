@@ -22,6 +22,14 @@ class Session(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+    connection_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    slot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
     mentor_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.user_id", ondelete="CASCADE"),

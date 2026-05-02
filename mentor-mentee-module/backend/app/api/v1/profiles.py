@@ -39,6 +39,7 @@ def _mentee_read(profile, email: str | None) -> MenteeProfileRead:
         last_name=ln,
         learning_goals=list(profile.learning_goals or []),
         education_level=profile.education_level,
+        cached_credit_score=int(profile.cached_credit_score or 0),
     )
 
 

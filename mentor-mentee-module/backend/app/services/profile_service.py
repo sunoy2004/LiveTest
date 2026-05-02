@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import MenteeProfile, MentorProfile, User
 from app.schemas.profile import MenteeProfileCreate, MentorProfileCreate
+from app.services.gamification_transactions import fetch_wallet_balance_from_gamification
 from app.utils.display_name import from_email
 
 
@@ -75,6 +76,15 @@ class ProfileService:
         mentor = await self._session.scalar(
             select(MentorProfile).where(MentorProfile.user_id == user_id),
         )
+        if mentee is not None:
+            balance = await fetch_wallet_balance_from_gamification(user_id)
+            if balance is not None:
+                mentee.cached_credit_score = balance
+                try:
+                    await self._session.commit()
+                    await self._session.refresh(mentee)
+                except Exception:
+                    await self._session.rollback()
         return mentee, mentor
 
     async def get_mentor_public_detail(self, mentor_user_id: uuid.UUID) -> dict | None:

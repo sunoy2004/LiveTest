@@ -91,7 +91,14 @@ export async function acceptSessionRequest(
   );
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(err || `accept failed (${res.status})`);
+    let msg = err || `accept failed (${res.status})`;
+    try {
+      const j = JSON.parse(err) as { detail?: string };
+      if (typeof j.detail === "string" && j.detail.trim()) msg = j.detail;
+    } catch {
+      /* use raw body */
+    }
+    throw new Error(msg);
   }
   return res.json() as Promise<{
     session_id: string;

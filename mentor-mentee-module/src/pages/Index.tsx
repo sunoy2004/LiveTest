@@ -115,7 +115,7 @@ const Index = () => {
     queryKey: ["user-service", "dashboard", "upcoming-sessions", token, role],
     queryFn: () => fetchDashboardUpcomingSessions(token!, role, 5),
     enabled: Boolean(token),
-    staleTime: 30_000,
+    staleTime: 5_000,
   });
 
   const upcomingSessionsLoadError =

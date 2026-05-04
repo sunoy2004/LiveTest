@@ -101,7 +101,9 @@ const ScheduleSessionDialog = ({
     queryKey: ["mentoring", "connected-mentors", token],
     queryFn: () => fetchConnectedMentors(token!),
     enabled: Boolean(open && role === "mentee" && token),
-    staleTime: 15_000,
+    /** Always refetch when opening — `session_credit_cost` tracks live gamification BOOK_MENTOR_SESSION. */
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   useEffect(() => {

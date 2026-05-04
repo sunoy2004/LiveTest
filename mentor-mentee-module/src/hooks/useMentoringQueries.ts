@@ -5,10 +5,11 @@ import {
   getDashboardVault,
   getSearch,
   getProfilesMe,
+  getMentorPublicDetail,
 } from "@/lib/api/mentoring";
 import { getRecommendations } from "@/lib/api/ai";
 import { isAiApiConfigured, isMentoringApiConfigured } from "@/config/mentoring";
-import type { MentoringProfileMeResponse, SearchRole } from "@/types/domain";
+import type { AiRecommendationItem, MentoringProfileMeResponse, SearchRole } from "@/types/domain";
 import { useMentorShellAuth } from "@/context/MentorShellAuthContext";
 
 export const qk = {
@@ -54,9 +55,28 @@ export function useDashboardVault(enabled = isMentoringApiConfigured()) {
 
 export function useAiRecommendations(enabled = isAiApiConfigured()) {
   const { user } = useMentorShellAuth();
+  const canEnrich = isMentoringApiConfigured();
   return useQuery({
-    queryKey: [...qk.aiRecommendations, user?.id],
-    queryFn: () => getRecommendations(user!.id),
+    queryKey: [...qk.aiRecommendations, user?.id, canEnrich ? "enrich" : "raw"],
+    queryFn: async (): Promise<AiRecommendationItem[]> => {
+      const raw = await getRecommendations(user!.id);
+      if (!canEnrich || !raw.length) return raw;
+      const enriched = await Promise.all(
+        raw.map(async (item): Promise<AiRecommendationItem> => {
+          const existing = (item.display_name ?? "").trim();
+          if (existing) return item;
+          try {
+            const detail = await getMentorPublicDetail(item.mentor_id);
+            const name = (detail?.display_name ?? "").trim();
+            if (name) return { ...item, display_name: name };
+          } catch {
+            /* mentoring unreachable or 404 */
+          }
+          return item;
+        }),
+      );
+      return enriched;
+    },
     enabled: enabled && Boolean(user?.id),
   });
 }

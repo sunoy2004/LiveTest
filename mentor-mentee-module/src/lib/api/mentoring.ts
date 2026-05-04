@@ -14,6 +14,13 @@ export async function getProfilesMe(): Promise<MentoringProfileMeResponse> {
   return mentoringJson<MentoringProfileMeResponse>(mentoringPaths.profilesMe, { method: "GET" });
 }
 
+/** GET /api/v1/profiles/mentor/{mentor_user_id} — public card (display_name from mentoring DB). */
+export async function getMentorPublicDetail(mentorUserId: string): Promise<{ display_name?: string | null }> {
+  return mentoringJson<{ display_name?: string | null }>(mentoringPaths.profilesMentor(mentorUserId), {
+    method: "GET",
+  });
+}
+
 export async function postMenteeProfile(body: PostMenteeProfileBody): Promise<void> {
   await mentoringJson(mentoringPaths.profilesMentee, {
     method: "POST",

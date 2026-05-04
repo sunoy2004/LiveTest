@@ -29,7 +29,7 @@ export function mapAiRecommendationToMatchProfile(a: AiRecommendationItem): Matc
     ? `Similarity match: ${skills.slice(0, 5).join(", ")}.`
     : hasName
       ? "Ranked by embedding similarity to your goals and their profile."
-      : "Similarity is live; display names need the AI service to load the user-service snapshot (see docs).";
+      : "Mentoring profile name will appear when the mentoring API can resolve this mentor (configure VITE_MENTORING_API_BASE_URL).";
   const scorePct = Math.round(Math.max(0, Math.min(1, a.score ?? 0)) * 100);
   return {
     id: a.mentor_id,

@@ -87,6 +87,8 @@ export function isAiApiConfigured(): boolean {
 export const mentoringPaths = {
   profilesMe: `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/profiles/me`,
   profilesMentee: `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/profiles/mentee`,
+  profilesMentor: (mentorUserId: string) =>
+    `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/profiles/mentor/${encodeURIComponent(mentorUserId)}`,
   search: `${getMentoringDomainBaseUrl()}${MENTORING_API_PREFIX}/search`,
   schedulingAvailability: (mentorId: string) =>
     `${getMentoringApiBaseUrl()}${MENTORING_API_PREFIX}/scheduling/availability?mentor_id=${encodeURIComponent(mentorId)}`,

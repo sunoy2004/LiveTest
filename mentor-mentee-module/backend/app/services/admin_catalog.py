@@ -2,7 +2,7 @@
 
 Queries adapt to schema drift: some DBs were created from Alembic 001 (e.g. reports `id`,
 `mentor_profiles.full_name`) and others from SQLAlchemy models (`report_id`, `bio`, no `tier_id`).
-Admin mentor roster names use person-name columns only; `bio` is never used as a display name.
+Admin roster names use person-name columns and short structured fields only — not long bios or goal essays.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ async def _columns(session: AsyncSession, table: str) -> frozenset[str]:
 
 
 def _mentor_display_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str:
-    """Admin display: person-name columns, else short bio / expertise (not tier pricing)."""
+    """Admin display: person-name and headline-like columns, then short expertise — not bio."""
     a = alias
     parts: list[str] = []
     if "first_name" in mp_cols and "last_name" in mp_cols:
@@ -72,8 +72,9 @@ def _mentor_display_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str
         )
     if "full_name" in mp_cols:
         parts.append(f"NULLIF(TRIM({a}.full_name::text), '')")
-    if "bio" in mp_cols:
-        parts.append(f"NULLIF(TRIM(LEFT(COALESCE({a}.bio::text, ''), 100)), '')")
+    for col in ("display_name", "headline", "public_name", "current_title"):
+        if col in mp_cols:
+            parts.append(f"NULLIF(TRIM(LEFT(COALESCE({a}.{col}::text, ''), 120)), '')")
     exp_col = next(
         (c for c in ("expertise", "expertise_areas", "topics") if c in mp_cols),
         None,
@@ -88,7 +89,7 @@ def _mentor_display_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str
 
 
 def _mentee_display_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str:
-    """Admin display: full_name / first+last, else learning goals or education_level."""
+    """Admin display: person-name columns and short education — not long learning_goals text."""
     a = alias
     parts: list[str] = []
     if "first_name" in mp_cols and "last_name" in mp_cols:
@@ -98,12 +99,11 @@ def _mentee_display_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str
         )
     if "full_name" in mp_cols:
         parts.append(f"NULLIF(TRIM({a}.full_name::text), '')")
-    if "learning_goals" in mp_cols:
-        parts.append(
-            f"NULLIF(TRIM(LEFT(COALESCE(array_to_string({a}.learning_goals, ', ')::text, ''), 100)), '')"
-        )
+    for col in ("display_name", "preferred_name", "headline"):
+        if col in mp_cols:
+            parts.append(f"NULLIF(TRIM(LEFT(COALESCE({a}.{col}::text, ''), 120)), '')")
     if "education_level" in mp_cols:
-        parts.append(f"NULLIF(TRIM(COALESCE({a}.education_level::text, '')), '')")
+        parts.append(f"NULLIF(TRIM(LEFT(COALESCE({a}.education_level::text, ''), 64)), '')")
     if not parts:
         return "''::text"
     return "COALESCE(" + ", ".join(parts) + ", '')"

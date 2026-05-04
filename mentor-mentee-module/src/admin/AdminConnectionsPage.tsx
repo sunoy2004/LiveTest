@@ -123,7 +123,7 @@ export default function AdminConnectionsPage() {
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
         <p>
           Search matches mentor or mentee name, user ID, or status. Mentors with no matching mentees are hidden when the query only
-          matches a mentee elsewhere.
+          matches a mentee elsewhere. The second line on each mentor card is their user ID.
         </p>
       </div>
 

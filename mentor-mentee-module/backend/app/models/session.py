@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, String
+from sqlalchemy import DateTime, Integer, String
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -43,6 +43,8 @@ class Session(Base):
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=True)
+    #: Credits charged when the mentor accepted this booking (gamification rule + tier fallback).
+    session_credit_cost: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

@@ -150,6 +150,7 @@ class SessionService:
             status="SCHEDULED",
             connection_id=connection_uuid,
             slot_id=slot.id if slot else None,
+            session_credit_cost=credit_amount,
         )
         self._session.add(new_sess)
         req.status = "APPROVED"

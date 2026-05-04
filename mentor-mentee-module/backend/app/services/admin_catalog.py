@@ -206,6 +206,14 @@ def _sessions_tier_join(mp_cols: frozenset[str]) -> str:
     return "LEFT JOIN mentor_tiers mt ON mt.tier_id = 'PEER'"
 
 
+def _admin_session_price_sql(sess_cols: frozenset[str]) -> str:
+    """Prefer credits stored at booking; else tier table (legacy rows)."""
+    tier = "COALESCE(mt.session_credit_cost, 0)"
+    if "session_credit_cost" in sess_cols:
+        return f"COALESCE(s.session_credit_cost, {tier})"
+    return tier
+
+
 async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
     sess_cols = await _columns(session, "sessions")
     mc_cols = await _columns(session, "mentorship_connections")
@@ -226,6 +234,7 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
     order_sql = ", ".join(order_parts) if order_parts else "s.session_id"
 
     tier_join = _sessions_tier_join(mp_cols)
+    price_sql = _admin_session_price_sql(sess_cols)
 
     if "mentor_user_id" in sess_cols and "mentee_user_id" in sess_cols:
         sql = f"""
@@ -233,7 +242,7 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
                    {conn_sel} AS connection_id,
                    um.email AS mentor_email, ue.email AS mentee_email,
                    {start_sel} AS start_time, s.status,
-                   COALESCE(mt.session_credit_cost, 0) AS price
+                   {price_sql} AS price
             FROM sessions s
             INNER JOIN users um ON um.user_id = s.mentor_user_id
             INNER JOIN users ue ON ue.user_id = s.mentee_user_id
@@ -258,7 +267,7 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
                    COALESCE(s.connection_id::text, '') AS connection_id,
                    um.email AS mentor_email, ue.email AS mentee_email,
                    {start_sel} AS start_time, s.status,
-                   COALESCE(mt.session_credit_cost, 0) AS price
+                   {price_sql} AS price
             FROM sessions s
             INNER JOIN mentorship_connections mc ON mc.connection_id = s.connection_id
             INNER JOIN users um ON um.user_id = mc.mentor_user_id

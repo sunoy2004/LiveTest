@@ -1,0 +1,4 @@
+# Local smoke launcher (contains secrets) — keep a copy via mentoring_api_smoke_cloud.example.py
+scripts/mentoring_api_smoke_cloud.py
+
+scripts/__pycache__/

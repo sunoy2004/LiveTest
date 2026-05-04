@@ -16,6 +16,25 @@ from app.services.search_service import SearchService
 security = HTTPBearer(auto_error=False)
 
 
+async def jwt_email_from_bearer(
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+) -> str:
+    """Email from JWT (User Service); mentoring `users` row no longer stores email."""
+    if creds is None or creds.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    payload = auth.verify_token(creds.credentials)
+    em = payload.get("email")
+    if not em:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has no email claim",
+        )
+    return str(em)
+
+
 def _roles_from_payload(payload: dict[str, Any]) -> list[str]:
     raw = payload.get("role", [])
     if raw is None:
@@ -81,15 +100,12 @@ async def require_user_id(
         try:
             stmt = insert(User).values(
                 user_id=uid,
-                email=payload["email"],
                 role=role_array,
-                password_hash="[REDACTED]"
             ).on_conflict_do_update(
                 index_elements=[User.user_id],
                 set_={
-                    "email": payload["email"],
                     "role": role_array,
-                }
+                },
             )
             await db.execute(stmt)
             await db.commit()

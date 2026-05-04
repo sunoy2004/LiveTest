@@ -3,18 +3,16 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc, select, or_, and_
-from sqlalchemy.orm import aliased
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.publisher import publish_event
-from app.utils.display_name import from_email
+from app.utils.display_name import label_from_user_id
 from app.models import (
     MenteeProfile,
     MentorProfile,
     MentorshipConnection,
     MentorshipRequest,
-    User,
 )
 from app.models.enums import (
     GuardianConsentStatus,
@@ -96,42 +94,34 @@ class MentorshipRequestService:
         return req
 
     async def get_incoming_requests(self, mentor_user_id: uuid.UUID) -> list[dict]:
-        stmt = (
-            select(MentorshipRequest, User.email)
-            .join(User, MentorshipRequest.sender_user_id == User.user_id)
-            .where(
-                MentorshipRequest.receiver_user_id == mentor_user_id,
-                MentorshipRequest.status == MentorshipRequestStatus.PENDING,
-            )
+        stmt = select(MentorshipRequest).where(
+            MentorshipRequest.receiver_user_id == mentor_user_id,
+            MentorshipRequest.status == MentorshipRequestStatus.PENDING,
         )
-        results = (await self._session.execute(stmt)).all()
+        results = (await self._session.execute(stmt)).scalars().all()
         out = []
-        for req, email in results:
+        for req in results:
             intro = getattr(req, "intro_message", None) or ""
             d = {
                 "sender_user_id": str(req.sender_user_id),
                 "receiver_user_id": str(req.receiver_user_id),
                 "status": req.status,
-                "mentee_name": from_email(email),
+                "mentee_name": label_from_user_id(req.sender_user_id),
                 "intro_message": intro,
             }
             out.append(d)
         return out
 
     async def get_outgoing_requests(self, mentee_user_id: uuid.UUID) -> list[dict]:
-        stmt = (
-            select(MentorshipRequest, User.email)
-            .join(User, MentorshipRequest.receiver_user_id == User.user_id)
-            .where(MentorshipRequest.sender_user_id == mentee_user_id)
-        )
-        results = (await self._session.execute(stmt)).all()
+        stmt = select(MentorshipRequest).where(MentorshipRequest.sender_user_id == mentee_user_id)
+        results = (await self._session.execute(stmt)).scalars().all()
         out = []
-        for req, email in results:
+        for req in results:
             d = {
                 "sender_user_id": str(req.sender_user_id),
                 "receiver_user_id": str(req.receiver_user_id),
                 "status": req.status,
-                "mentor_name": from_email(email),
+                "mentor_name": label_from_user_id(req.receiver_user_id),
             }
             out.append(d)
         return out
@@ -139,12 +129,8 @@ class MentorshipRequestService:
     async def list_request_history(self, user_id: uuid.UUID, *, limit: int = 100) -> list[dict]:
         """All `mentorship_requests` where the user is sender (mentee) or receiver (mentor)."""
         limit = max(1, min(int(limit), 200))
-        SenderUser = aliased(User)
-        ReceiverUser = aliased(User)
         stmt = (
-            select(MentorshipRequest, SenderUser.email, ReceiverUser.email)
-            .join(SenderUser, MentorshipRequest.sender_user_id == SenderUser.user_id)
-            .join(ReceiverUser, MentorshipRequest.receiver_user_id == ReceiverUser.user_id)
+            select(MentorshipRequest)
             .where(
                 or_(
                     MentorshipRequest.sender_user_id == user_id,
@@ -154,10 +140,10 @@ class MentorshipRequestService:
             .order_by(desc(MentorshipRequest.created_at))
             .limit(limit)
         )
-        results = (await self._session.execute(stmt)).all()
+        results = (await self._session.execute(stmt)).scalars().all()
         uid_str = str(user_id)
         out: list[dict] = []
-        for req, sender_email, receiver_email in results:
+        for req in results:
             intro = getattr(req, "intro_message", None) or ""
             out.append(
                 {
@@ -166,8 +152,8 @@ class MentorshipRequestService:
                     "status": req.status,
                     "intro_message": intro,
                     "created_at": req.created_at.isoformat() if req.created_at else None,
-                    "mentee_name": from_email(sender_email),
-                    "mentor_name": from_email(receiver_email),
+                    "mentee_name": label_from_user_id(req.sender_user_id),
+                    "mentor_name": label_from_user_id(req.receiver_user_id),
                     "you_are": "mentor"
                     if uid_str == str(req.receiver_user_id)
                     else "mentee",
@@ -184,29 +170,22 @@ class MentorshipRequestService:
         return [{"id": str(r.user_id), "goal": r.goal} for r in results]
 
     async def get_active_connections(self, user_id: uuid.UUID) -> list[dict]:
-        MentorUser = aliased(User)
-        MenteeUser = aliased(User)
-        stmt = (
-            select(MentorshipConnection, MentorUser.email, MenteeUser.email)
-            .join(MentorUser, MentorshipConnection.mentor_user_id == MentorUser.user_id)
-            .join(MenteeUser, MentorshipConnection.mentee_user_id == MenteeUser.user_id)
-            .where(
-                or_(
-                    MentorshipConnection.mentor_user_id == user_id,
-                    MentorshipConnection.mentee_user_id == user_id
-                ),
-                MentorshipConnection.status == "ACTIVE"
-            )
+        stmt = select(MentorshipConnection).where(
+            or_(
+                MentorshipConnection.mentor_user_id == user_id,
+                MentorshipConnection.mentee_user_id == user_id,
+            ),
+            MentorshipConnection.status == "ACTIVE",
         )
-        results = (await self._session.execute(stmt)).all()
+        results = (await self._session.execute(stmt)).scalars().all()
         out = []
-        for conn, mentor_email, mentee_email in results:
+        for conn in results:
             d = {
                 "mentor_user_id": str(conn.mentor_user_id),
                 "mentee_user_id": str(conn.mentee_user_id),
                 "status": conn.status,
-                "mentor_name": from_email(mentor_email),
-                "mentee_name": from_email(mentee_email),
+                "mentor_name": label_from_user_id(conn.mentor_user_id),
+                "mentee_name": label_from_user_id(conn.mentee_user_id),
             }
             out.append(d)
         return out

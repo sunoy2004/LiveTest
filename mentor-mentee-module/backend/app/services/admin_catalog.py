@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.utils.connection_token import mentoring_connection_token
+from app.utils.display_name import label_from_user_id_str
 
 # Cached per process — physical column names in `public` (see `_columns`).
 _col_cache: dict[str, frozenset[str]] = {}
@@ -102,12 +103,11 @@ async def list_admin_mentors(session: AsyncSession) -> list[dict[str, Any]]:
     r = await session.execute(
         text(
             f"""
-            SELECT mp.user_id::text AS id, u.email AS email,
+            SELECT mp.user_id::text AS id, ''::text AS email,
                    {name_sql} AS full_name,
                    {tier_sql} AS tier
             FROM mentor_profiles mp
-            INNER JOIN users u ON u.user_id = mp.user_id
-            ORDER BY u.email ASC
+            ORDER BY mp.user_id ASC
             """
         )
     )
@@ -139,12 +139,11 @@ async def list_admin_mentees(session: AsyncSession) -> list[dict[str, Any]]:
     r = await session.execute(
         text(
             f"""
-            SELECT mp.user_id::text AS id, u.email AS email,
+            SELECT mp.user_id::text AS id, ''::text AS email,
                    {name_sql} AS full_name,
                    'ACTIVE'::text AS status
             FROM mentee_profiles mp
-            INNER JOIN users u ON u.user_id = mp.user_id
-            ORDER BY u.email ASC
+            ORDER BY mp.user_id ASC
             """
         )
     )
@@ -167,12 +166,11 @@ async def list_admin_connections(session: AsyncSession, limit: int = 500) -> lis
         text(
             """
             SELECT mc.mentor_user_id::text, mc.mentee_user_id::text,
-                   um.email AS mentor_email, ue.email AS mentee_email,
+                   mc.mentor_user_id::text AS mentor_email,
+                   mc.mentee_user_id::text AS mentee_email,
                    COALESCE(mc.status, 'UNKNOWN') AS status
             FROM mentorship_connections mc
-            INNER JOIN users um ON um.user_id = mc.mentor_user_id
-            INNER JOIN users ue ON ue.user_id = mc.mentee_user_id
-            ORDER BY um.email ASC, ue.email ASC
+            ORDER BY mc.mentor_user_id ASC, mc.mentee_user_id ASC
             LIMIT :lim
             """
         ),
@@ -240,12 +238,11 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
         sql = f"""
             SELECT s.session_id::text,
                    {conn_sel} AS connection_id,
-                   um.email AS mentor_email, ue.email AS mentee_email,
+                   s.mentor_user_id::text AS mentor_email,
+                   s.mentee_user_id::text AS mentee_email,
                    {start_sel} AS start_time, s.status,
                    {price_sql} AS price
             FROM sessions s
-            INNER JOIN users um ON um.user_id = s.mentor_user_id
-            INNER JOIN users ue ON ue.user_id = s.mentee_user_id
             {tier_join}
             ORDER BY {order_sql}
             LIMIT 500
@@ -265,13 +262,12 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
         sql = f"""
             SELECT s.session_id::text,
                    COALESCE(s.connection_id::text, '') AS connection_id,
-                   um.email AS mentor_email, ue.email AS mentee_email,
+                   mc.mentor_user_id::text AS mentor_email,
+                   mc.mentee_user_id::text AS mentee_email,
                    {start_sel} AS start_time, s.status,
                    {price_sql} AS price
             FROM sessions s
             INNER JOIN mentorship_connections mc ON mc.connection_id = s.connection_id
-            INNER JOIN users um ON um.user_id = mc.mentor_user_id
-            INNER JOIN users ue ON ue.user_id = mc.mentee_user_id
             {tier_join_mc}
             ORDER BY {order_sql}
             LIMIT 500
@@ -287,8 +283,8 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
             {
                 "session_id": sid,
                 "connection_id": conn_id or "",
-                "mentor_name": _display_name(memail, None),
-                "mentee_name": _display_name(meemail, None),
+                "mentor_name": label_from_user_id_str(memail),
+                "mentee_name": label_from_user_id_str(meemail),
                 "start_time": start.isoformat() if isinstance(start, datetime) else str(start or ""),
                 "status": (st or "").upper() or "UNKNOWN",
                 "price": int(price or 0),

@@ -1,10 +1,12 @@
 import uuid
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import MenteeProfile, MentorProfile, User
+from app.models import MenteeProfile, MentorProfile
 from app.schemas.search import SearchResult, SearchRole
+from app.utils.display_name import label_from_user_id
+
 
 class SearchService:
     def __init__(self, session: AsyncSession) -> None:
@@ -48,7 +50,7 @@ class SearchService:
         user_id: uuid.UUID | None,
         limit: int,
     ) -> list[SearchResult]:
-        stmt = select(MentorProfile, User.email).join(User, MentorProfile.user_id == User.user_id).limit(limit)
+        stmt = select(MentorProfile).limit(limit)
 
         if user_id is not None:
             stmt = stmt.where(MentorProfile.user_id == user_id)
@@ -57,22 +59,22 @@ class SearchService:
                 func.array_to_string(MentorProfile.expertise, " "),
                 "",
             )
-            email_match = User.email.ilike(f"%{query}%")
             expertise_match = expertise_blob.ilike(f"%{query}%")
             bio_match = func.coalesce(MentorProfile.bio, "").ilike(f"%{query}%")
-            stmt = stmt.where(or_(expertise_match, email_match, bio_match))
+            uid_match = cast(MentorProfile.user_id, String).ilike(f"%{query}%")
+            stmt = stmt.where(or_(expertise_match, bio_match, uid_match))
 
-        results = (await self._session.execute(stmt)).all()
+        results = (await self._session.execute(stmt)).scalars().all()
         return [
             SearchResult(
                 user_id=m.user_id,
-                first_name=email.split("@")[0].replace(".", " ").replace("_", " ").title(),
+                first_name=label_from_user_id(m.user_id),
                 last_name=None,
                 role=SearchRole.mentor,
                 expertise=list(m.expertise or []),
-                tier="PEER", # Default tier for now
+                tier="PEER",
             )
-            for m, email in results
+            for m in results
         ]
 
     async def _search_mentees(
@@ -82,7 +84,7 @@ class SearchService:
         user_id: uuid.UUID | None,
         limit: int,
     ) -> list[SearchResult]:
-        stmt = select(MenteeProfile, User.email).join(User, MenteeProfile.user_id == User.user_id).limit(limit)
+        stmt = select(MenteeProfile).limit(limit)
 
         if user_id is not None:
             stmt = stmt.where(MenteeProfile.user_id == user_id)
@@ -91,22 +93,20 @@ class SearchService:
                 func.array_to_string(MenteeProfile.learning_goals, " "),
                 "",
             )
-            email_match = User.email.ilike(f"%{query}%")
             goals_match = goals_blob.ilike(f"%{query}%")
-            edu_match = func.coalesce(MenteeProfile.education_level, "").ilike(
-                f"%{query}%"
-            )
-            stmt = stmt.where(or_(goals_match, email_match, edu_match))
+            edu_match = func.coalesce(MenteeProfile.education_level, "").ilike(f"%{query}%")
+            uid_match = cast(MenteeProfile.user_id, String).ilike(f"%{query}%")
+            stmt = stmt.where(or_(goals_match, edu_match, uid_match))
 
-        results = (await self._session.execute(stmt)).all()
+        results = (await self._session.execute(stmt)).scalars().all()
         return [
             SearchResult(
                 user_id=m.user_id,
-                first_name=email.split("@")[0].replace(".", " ").replace("_", " ").title(),
+                first_name=label_from_user_id(m.user_id),
                 last_name=None,
                 role=SearchRole.mentee,
                 expertise=list(m.learning_goals or []),
                 tier=None,
             )
-            for m, email in results
+            for m in results
         ]

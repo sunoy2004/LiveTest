@@ -4,10 +4,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import MenteeProfile, MentorProfile, User
+from app.models import MenteeProfile, MentorProfile
 from app.schemas.profile import MenteeProfileCreate, MentorProfileCreate
 from app.services.gamification_transactions import fetch_wallet_balance_from_gamification
-from app.utils.display_name import from_email
+from app.utils.display_name import label_from_user_id
 
 
 class ProfileService:
@@ -94,13 +94,12 @@ class ProfileService:
         )
         if mp is None:
             return None
-        user = await self._session.get(User, mentor_user_id)
         # Production DB may omit mentor_profiles.tier_id; UI still expects a tier label.
         tier_id = "PEER"
         uid = str(mp.user_id)
         return {
-            "email": user.email if user else "",
-            "display_name": from_email(user.email if user else None),
+            "email": "",
+            "display_name": label_from_user_id(mentor_user_id),
             "mentor_profile": {
                 "id": uid,
                 "user_id": uid,

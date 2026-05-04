@@ -4,7 +4,6 @@ from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy import select, func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -13,9 +12,8 @@ from app.models import (
     Session as MentorshipSession,
     SessionBookingRequest,
     SessionHistory,
-    User,
 )
-from app.utils.display_name import from_email
+from app.utils.display_name import label_from_user_id
 from app.services.upcoming_sessions_merge import list_merged_upcoming_sessions
 
 
@@ -140,30 +138,30 @@ class DashboardService:
         return _goal_api_item(row)
 
     async def get_vault(self, user_id: uuid.UUID) -> list[dict]:
-        MentorU = aliased(User)
-        MenteeU = aliased(User)
-
         stmt = (
-            select(MentorshipSession, SessionHistory, MentorU.email, MenteeU.email)
+            select(MentorshipSession, SessionHistory)
             .join(SessionHistory, SessionHistory.session_id == MentorshipSession.id)
-            .outerjoin(MentorU, MentorshipSession.mentor_user_id == MentorU.user_id)
-            .outerjoin(MenteeU, MentorshipSession.mentee_user_id == MenteeU.user_id)
             .where(
                 or_(
                     MentorshipSession.mentee_user_id == user_id,
-                    MentorshipSession.mentor_user_id == user_id
+                    MentorshipSession.mentor_user_id == user_id,
                 )
             )
             .order_by(MentorshipSession.start_time.desc())
         )
         results = (await self._session.execute(stmt)).all()
-        return [{
-            "session_id": str(sess.id),
-            "start_time": sess.start_time,
-            "notes": hist.notes or "",
-            "rating": hist.rating,
-            "partner_name": from_email(mentor_email) if sess.mentee_user_id == user_id else from_email(mentee_email)
-        } for sess, hist, mentor_email, mentee_email in results]
+        return [
+            {
+                "session_id": str(sess.id),
+                "start_time": sess.start_time,
+                "notes": hist.notes or "",
+                "rating": hist.rating,
+                "partner_name": label_from_user_id(sess.mentor_user_id)
+                if sess.mentee_user_id == user_id
+                else label_from_user_id(sess.mentee_user_id),
+            }
+            for sess, hist in results
+        ]
 
     async def get_session_booking_request_ledger(
         self,
@@ -172,13 +170,8 @@ class DashboardService:
         limit: int = 100,
     ) -> list[dict]:
         """All session booking rows involving this user (mentee or mentor), newest first."""
-        MentorU = aliased(User)
-        MenteeU = aliased(User)
-
         stmt = (
-            select(SessionBookingRequest, MentorU.email, MenteeU.email)
-            .outerjoin(MentorU, SessionBookingRequest.mentor_user_id == MentorU.user_id)
-            .outerjoin(MenteeU, SessionBookingRequest.mentee_user_id == MenteeU.user_id)
+            select(SessionBookingRequest)
             .where(
                 or_(
                     SessionBookingRequest.mentee_user_id == user_id,
@@ -191,11 +184,15 @@ class DashboardService:
             )
             .limit(limit)
         )
-        rows = (await self._session.execute(stmt)).all()
+        rows = (await self._session.execute(stmt)).scalars().all()
         out: list[dict] = []
-        for req, mentor_email, mentee_email in rows:
+        for req in rows:
             is_mentee = req.mentee_user_id == user_id
-            partner_name = from_email(mentor_email) if is_mentee else from_email(mentee_email)
+            partner_name = (
+                label_from_user_id(req.mentor_user_id)
+                if is_mentee
+                else label_from_user_id(req.mentee_user_id)
+            )
             st = req.requested_time
             ca = req.created_at
             out.append(

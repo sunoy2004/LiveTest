@@ -13,7 +13,6 @@ from app.models import Session as MentorshipSession
 from app.models import SessionBookingRequest
 from app.models import SessionHistory
 from app.models import TimeSlot
-from app.models import User
 from app.services.book_mentor_session_credits import resolve_default_book_session_credits
 from app.services.gamification_transactions import (
     deduct_book_mentor_session_credits,
@@ -21,7 +20,7 @@ from app.services.gamification_transactions import (
 )
 from app.services.upcoming_sessions_merge import list_merged_upcoming_sessions
 from app.utils.connection_token import mentoring_connection_token
-from app.utils.display_name import from_email
+from app.utils.display_name import label_from_user_id
 
 
 class SessionService:
@@ -62,8 +61,7 @@ class SessionService:
         default_booking_credits = await resolve_default_book_session_credits(tier_fallback)
         out: list[dict] = []
         for req in rows:
-            mentee_u = await self._session.get(User, req.mentee_user_id) if req.mentee_user_id else None
-            mentee_name = from_email(mentee_u.email if mentee_u else None) or "Mentee"
+            mentee_name = label_from_user_id(req.mentee_user_id) if req.mentee_user_id else "Mentee"
             conn_id = mentoring_connection_token(req.mentor_user_id, req.mentee_user_id)
             slot_row = await self._session.scalar(
                 select(TimeSlot).where(

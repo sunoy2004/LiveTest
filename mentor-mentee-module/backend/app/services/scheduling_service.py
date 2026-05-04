@@ -11,12 +11,11 @@ from app.models import (
     MentorshipConnection,
     SessionBookingRequest,
     TimeSlot,
-    User,
 )
 from app.services.book_mentor_session_credits import resolve_default_book_session_credits
 from app.services.gamification_transactions import fetch_wallet_balance_from_gamification
 from app.utils.connection_token import mentoring_connection_token
-from app.utils.display_name import from_email
+from app.utils.display_name import label_from_user_id
 
 
 class SchedulingService:
@@ -113,9 +112,8 @@ class SchedulingService:
     async def get_connected_mentors(self, mentee_user_id: uuid.UUID) -> list[dict]:
         """Mentors with ACTIVE connection to this mentee (SPA scheduling)."""
         stmt = (
-            select(MentorshipConnection, MentorProfile, User)
+            select(MentorshipConnection, MentorProfile)
             .join(MentorProfile, MentorshipConnection.mentor_user_id == MentorProfile.user_id)
-            .join(User, MentorProfile.user_id == User.user_id)
             .where(
                 MentorshipConnection.mentee_user_id == mentee_user_id,
                 MentorshipConnection.status == "ACTIVE",
@@ -125,7 +123,7 @@ class SchedulingService:
         # Default cost: gamification BOOK_MENTOR_SESSION.base_credit_value; PEER tier is fallback only.
         default_credit = await self._default_booking_credits()
         out: list[dict] = []
-        for conn, mp, mentor_user in rows:
+        for conn, mp in rows:
             tier_txt = "PEER"
             credit_cost = default_credit
             conn_token = mentoring_connection_token(conn.mentor_user_id, conn.mentee_user_id)
@@ -133,7 +131,7 @@ class SchedulingService:
                 {
                     "connection_id": conn_token,
                     "mentor_id": str(conn.mentor_user_id),
-                    "mentor_name": from_email(mentor_user.email),
+                    "mentor_name": label_from_user_id(conn.mentor_user_id),
                     "expertise": list(mp.expertise or []),
                     "total_hours": 0,
                     "tier": tier_txt,

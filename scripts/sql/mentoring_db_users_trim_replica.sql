@@ -1,0 +1,2 @@
+-- Deprecated: use `mentoring_and_gamification_users_replica_minimal.sql` and mentoring
+-- Alembic revisions `010_users_replica_trim` + `011_users_drop_email`.

@@ -6,15 +6,13 @@ import uuid
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Session as MentorshipSession
 from app.models import SessionBookingRequest
-from app.models import User
 from app.services.book_mentor_session_credits import resolve_default_book_session_credits
 from app.models import MentorTier
-from app.utils.display_name import from_email
+from app.utils.display_name import label_from_user_id
 
 
 def _dt_key(dt: datetime | None) -> float:
@@ -38,15 +36,10 @@ async def list_merged_upcoming_sessions(
     tier_fallback = int(tier_def.session_credit_cost) if tier_def else 0
     cost = await resolve_default_book_session_credits(tier_fallback)
 
-    MentorU = aliased(User)
-    MenteeU = aliased(User)
-
     cap = max(limit * 4, limit + 10)
 
     stmt_sched = (
-        select(MentorshipSession, MentorU.email, MenteeU.email)
-        .outerjoin(MentorU, MentorshipSession.mentor_user_id == MentorU.user_id)
-        .outerjoin(MenteeU, MentorshipSession.mentee_user_id == MenteeU.user_id)
+        select(MentorshipSession)
         .where(
             or_(
                 MentorshipSession.mentee_user_id == user_id,
@@ -63,12 +56,8 @@ async def list_merged_upcoming_sessions(
         .limit(cap)
     )
 
-    MentorP = aliased(User)
-    MenteeP = aliased(User)
     stmt_pending = (
-        select(SessionBookingRequest, MentorP.email, MenteeP.email)
-        .outerjoin(MentorP, SessionBookingRequest.mentor_user_id == MentorP.user_id)
-        .outerjoin(MenteeP, SessionBookingRequest.mentee_user_id == MenteeP.user_id)
+        select(SessionBookingRequest)
         .where(
             or_(
                 SessionBookingRequest.mentee_user_id == user_id,
@@ -85,16 +74,16 @@ async def list_merged_upcoming_sessions(
         .limit(cap)
     )
 
-    rows_s = (await session.execute(stmt_sched)).all()
-    rows_p = (await session.execute(stmt_pending)).all()
+    rows_s = (await session.execute(stmt_sched)).scalars().all()
+    rows_p = (await session.execute(stmt_pending)).scalars().all()
 
     merged: list[tuple[float, dict]] = []
 
-    for s, mentor_email, mentee_email in rows_s:
+    for s in rows_s:
         if s.mentee_user_id == user_id:
-            partner_name = from_email(mentor_email)
+            partner_name = label_from_user_id(s.mentor_user_id)
         else:
-            partner_name = from_email(mentee_email)
+            partner_name = label_from_user_id(s.mentee_user_id)
 
         display_start = s.start_time or s.created_at
         st_iso = display_start.isoformat() if display_start else ""
@@ -118,11 +107,11 @@ async def list_merged_upcoming_sessions(
             )
         )
 
-    for req, mentor_email, mentee_email in rows_p:
+    for req in rows_p:
         if req.mentee_user_id == user_id:
-            partner_name = from_email(mentor_email)
+            partner_name = label_from_user_id(req.mentor_user_id)
         else:
-            partner_name = from_email(mentee_email)
+            partner_name = label_from_user_id(req.mentee_user_id)
 
         display_start = req.requested_time or req.created_at
         st_iso = display_start.isoformat() if display_start else ""

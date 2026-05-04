@@ -74,7 +74,10 @@ def _mentor_display_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str
         parts.append(f"NULLIF(TRIM({a}.full_name::text), '')")
     if "bio" in mp_cols:
         parts.append(f"NULLIF(TRIM(LEFT(COALESCE({a}.bio::text, ''), 100)), '')")
-    exp_col = "expertise" if "expertise" in mp_cols else ("expertise_areas" if "expertise_areas" in mp_cols else None)
+    exp_col = next(
+        (c for c in ("expertise", "expertise_areas", "topics") if c in mp_cols),
+        None,
+    )
     if exp_col:
         parts.append(
             f"NULLIF(TRIM(LEFT(COALESCE(array_to_string({a}.{exp_col}, ', ')::text, ''), 80)), '')"
@@ -222,13 +225,14 @@ async def list_admin_connections(session: AsyncSession, limit: int = 500) -> lis
     return out
 
 
-def _sessions_tier_join(mp_cols: frozenset[str]) -> str:
+def _sessions_mentor_profile_and_tier_join(mp_cols: frozenset[str], mentor_id_sql: str) -> str:
+    """Always join `mentor_profiles` as `mp` — display-name SQL references `mp` even without `tier_id`."""
+    lines = [f"LEFT JOIN mentor_profiles mp ON mp.user_id = {mentor_id_sql}"]
     if "tier_id" in mp_cols:
-        return (
-            "LEFT JOIN mentor_profiles mp ON mp.user_id = s.mentor_user_id "
-            "LEFT JOIN mentor_tiers mt ON mt.tier_id = COALESCE(mp.tier_id, 'PEER')"
-        )
-    return "LEFT JOIN mentor_tiers mt ON mt.tier_id = 'PEER'"
+        lines.append("LEFT JOIN mentor_tiers mt ON mt.tier_id = COALESCE(mp.tier_id, 'PEER')")
+    else:
+        lines.append("LEFT JOIN mentor_tiers mt ON mt.tier_id = 'PEER'")
+    return "\n            ".join(lines)
 
 
 def _admin_session_price_sql(sess_cols: frozenset[str]) -> str:
@@ -259,14 +263,15 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
         order_parts.append("s.created_at DESC NULLS LAST")
     order_sql = ", ".join(order_parts) if order_parts else "s.session_id"
 
-    tier_join = _sessions_tier_join(mp_cols)
+    tier_block = _sessions_mentor_profile_and_tier_join(mp_cols, "s.mentor_user_id")
     price_sql = _admin_session_price_sql(sess_cols)
     mentor_nm = _mentor_display_name_expr(mp_cols, "mp")
     mentee_nm = _mentee_display_name_expr(mpee_cols, "mpe")
 
     if "mentor_user_id" in sess_cols and "mentee_user_id" in sess_cols:
         sess_join = (
-            "LEFT JOIN mentee_profiles mpe ON mpe.user_id = s.mentee_user_id\n            " + tier_join
+            tier_block
+            + "\n            LEFT JOIN mentee_profiles mpe ON mpe.user_id = s.mentee_user_id"
         )
         sql = f"""
             SELECT s.session_id::text,
@@ -288,16 +293,11 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
         and "mentor_user_id" in mc_cols
         and "mentee_user_id" in mc_cols
     ):
-        tier_join_mc = (
-            "LEFT JOIN mentor_profiles mp ON mp.user_id = mc.mentor_user_id "
-            "LEFT JOIN mentor_tiers mt ON mt.tier_id = COALESCE(mp.tier_id, 'PEER')"
-            if "tier_id" in mp_cols
-            else "LEFT JOIN mentor_tiers mt ON mt.tier_id = 'PEER'"
-        )
+        tier_block_mc = _sessions_mentor_profile_and_tier_join(mp_cols, "mc.mentor_user_id")
         join_mc = (
             "INNER JOIN mentorship_connections mc ON mc.connection_id = s.connection_id\n            "
             "LEFT JOIN mentee_profiles mpe ON mpe.user_id = mc.mentee_user_id\n            "
-            + tier_join_mc
+            + tier_block_mc
         )
         sql = f"""
             SELECT s.session_id::text,

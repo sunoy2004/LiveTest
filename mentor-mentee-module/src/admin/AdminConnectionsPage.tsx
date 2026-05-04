@@ -170,6 +170,14 @@ export default function AdminConnectionsPage() {
                         )}
                       >
                         <div className="font-medium">{g.mentorName}</div>
+                        <div
+                          className={cn(
+                            "mt-0.5 text-[10px] font-medium uppercase tracking-wide",
+                            active ? "text-primary-foreground/80" : "text-muted-foreground",
+                          )}
+                        >
+                          User ID
+                        </div>
                         <div className={cn("truncate text-xs", active ? "text-primary-foreground/90" : "text-muted-foreground")}>
                           {g.mentorEmail}
                         </div>

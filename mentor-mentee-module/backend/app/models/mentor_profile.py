@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
 from datetime import datetime, timezone
-from sqlalchemy import ForeignKey, Integer, Text, DateTime, String
+from sqlalchemy import ForeignKey, Integer, Text, DateTime
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
@@ -26,7 +26,7 @@ class MentorProfile(Base):
     user_id = synonym("id")
     # `tier_id` may exist on newer DBs (Alembic 001); production without that column uses
     # global `mentor_tiers` + default tier in services instead of a profile FK.
-    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Do not map `full_name` here unless the physical table has that column (schema varies).
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     expertise: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=True)
     experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)

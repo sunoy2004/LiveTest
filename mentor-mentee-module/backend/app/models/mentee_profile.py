@@ -24,7 +24,7 @@ class MenteeProfile(Base):
         index=True,
     )
     user_id = synonym("id")
-    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Do not map `full_name` unless present on the physical table (avoids SELECT errors on slim DBs).
     learning_goals: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=True)
     education_level: Mapped[str | None] = mapped_column(String(128), nullable=True)
     cached_credit_score: Mapped[int] = mapped_column(

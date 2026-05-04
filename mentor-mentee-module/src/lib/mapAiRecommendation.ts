@@ -44,7 +44,8 @@ export function mapAiRecommendationToMatchProfile(a: AiRecommendationItem): Matc
   return {
     id: a.mentor_id,
     mentorUserId: a.mentor_id,
-    mentorProfileId: a.mentor_profile_id ?? undefined,
+    /** Mentoring POST /requests and GET /profiles/mentor/{id} use mentor `user_id` — same as AI `mentor_id`. */
+    mentorProfileId: a.mentor_id,
     name,
     avatar: "",
     role: "mentor",

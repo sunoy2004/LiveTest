@@ -64,7 +64,11 @@ export function useAiRecommendations(enabled = isAiApiConfigured()) {
       const enriched = await Promise.all(
         raw.map(async (item): Promise<AiRecommendationItem> => {
           const existing = (item.display_name ?? "").trim();
-          if (existing) return item;
+          const looksSynthetic =
+            !existing ||
+            /^mentor\s+[0-9a-f-]{4,}/i.test(existing) ||
+            /^user\s+[0-9a-f-]{4,}/i.test(existing);
+          if (existing && !looksSynthetic) return item;
           try {
             const detail = await getMentorPublicDetail(item.mentor_id);
             const name = (detail?.display_name ?? "").trim();

@@ -332,7 +332,7 @@ const Index = () => {
       return {
         id: r.user_id,
         mentorUserId: isMentor ? r.user_id : undefined,
-        mentorProfileId: isMentor ? (r.mentor_profile_id ?? r.user_id) : undefined,
+        mentorProfileId: isMentor ? r.user_id : undefined,
         name: displayName(r),
         avatar: "",
         role: isMentor ? "mentor" : "mentee",

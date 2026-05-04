@@ -54,18 +54,19 @@ const AiMatchCard = ({ match, token, requestLocked }: Props) => {
     .slice(0, 2)
     .toUpperCase();
 
-  const mentorProfileId = match.mentorProfileId;
   const mentorUserId = match.mentorUserId ?? match.id;
-  const canConnect = Boolean(mentorProfileId && token);
+  /** Mentoring API always keys mentors by `user_id` (same as AI `mentor_id`). */
+  const mentorIdForApi = String(match.mentorProfileId ?? mentorUserId ?? match.id ?? "").trim();
+  const canConnect = Boolean(token && mentorIdForApi);
 
   const {
     data: mentorDetail,
     isFetching: mentorDetailLoading,
     isError: mentorDetailError,
   } = useQuery({
-    queryKey: ["user-service", "mentor-profile-detail", mentorProfileId],
-    queryFn: () => fetchMentorProfileDetail(token!, mentorProfileId!),
-    enabled: Boolean(profileOpen && token && mentorProfileId),
+    queryKey: ["user-service", "mentor-profile-detail", mentorIdForApi],
+    queryFn: () => fetchMentorProfileDetail(token!, mentorIdForApi),
+    enabled: Boolean(profileOpen && token && mentorIdForApi),
     staleTime: 60_000,
   });
 
@@ -95,11 +96,11 @@ const AiMatchCard = ({ match, token, requestLocked }: Props) => {
   };
 
   const handleConnectSubmit = async () => {
-    if (!token || !mentorProfileId) return;
+    if (!token || !mentorIdForApi) return;
     setBusy("connect");
     try {
       await postMentorshipRequest({
-        mentor_id: mentorProfileId,
+        mentor_id: mentorIdForApi,
         intro_message: intro.trim() || DEFAULT_MENTORSHIP_INTRO_MESSAGE,
       });
       toast({ title: "Request sent", description: "The mentor will see your introduction." });
@@ -187,8 +188,8 @@ const AiMatchCard = ({ match, token, requestLocked }: Props) => {
             title={
               requestLocked
                 ? "Guardian consent required"
-                : !mentorProfileId
-                  ? "Run AI reindex — mentor profile id missing"
+                : !mentorIdForApi
+                  ? "Missing mentor id"
                   : !token
                     ? "Sign in required"
                     : undefined
@@ -224,11 +225,11 @@ const AiMatchCard = ({ match, token, requestLocked }: Props) => {
           <DialogHeader>
             <DialogTitle>{mentorDetail?.display_name ?? match.name}</DialogTitle>
             <DialogDescription>
-              {mentorProfileId ? "Mentor profile details" : "AI-recommended mentor"}
+              {mentorIdForApi ? "Mentor profile details" : "AI-recommended mentor"}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 py-2 text-sm text-muted-foreground">
-            {mentorProfileId ? (
+            {mentorIdForApi ? (
               mentorDetailLoading ? (
                 <div className="flex items-center gap-2 text-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />

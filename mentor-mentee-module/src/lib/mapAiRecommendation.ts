@@ -18,16 +18,26 @@ export function mapAiRecommendationToMatchProfile(a: AiRecommendationItem): Matc
         : tier === "PROFESSIONAL"
           ? 100
           : 50;
-  const hasName = Boolean(a.display_name && a.display_name.trim());
-  const idShort = String(a.mentor_id).replace(/-/g, "").slice(0, 8) || "mentor";
-  const name = hasName
-    ? a.display_name!.trim()
-    : `Mentor ${idShort}`;
-
   const skills = Array.isArray(a.expertise_areas) && a.expertise_areas.length ? a.expertise_areas : [];
+  const expertiseLine = skills
+    .slice(0, 5)
+    .map((s) => String(s).trim())
+    .filter(Boolean)
+    .join(", ");
+  const rawName = (a.display_name ?? "").trim();
+  const hasName = Boolean(rawName);
+  const idShort = String(a.mentor_id).replace(/-/g, "").slice(0, 8) || "mentor";
+  /** Avoid using a bare expertise list as the card title when mentoring has no separate display name yet. */
+  const nameLooksLikeExpertiseOnly =
+    hasName &&
+    expertiseLine.length > 0 &&
+    rawName.replace(/\s+/g, " ").toLowerCase() === expertiseLine.toLowerCase();
+  const name = hasName && !nameLooksLikeExpertiseOnly ? rawName : `Mentor ${idShort}`;
+
+  const hasDisplayNameForBio = hasName && !nameLooksLikeExpertiseOnly;
   const bio = skills.length
     ? `Similarity match: ${skills.slice(0, 5).join(", ")}.`
-    : hasName
+    : hasDisplayNameForBio
       ? "Ranked by embedding similarity to your goals and their profile."
       : "Mentoring profile name will appear when the mentoring API can resolve this mentor (configure VITE_MENTORING_API_BASE_URL).";
   const scorePct = Math.round(Math.max(0, Math.min(1, a.score ?? 0)) * 100);

@@ -15,7 +15,7 @@ from app.models import (
 from app.services.book_mentor_session_credits import resolve_default_book_session_credits
 from app.services.gamification_transactions import fetch_wallet_balance_from_gamification
 from app.utils.connection_token import mentoring_connection_token
-from app.utils.profile_display_name import partner_display_name_from_mentor_profile
+from app.utils.profile_display_name import mentor_display_name_map
 
 
 class SchedulingService:
@@ -120,6 +120,10 @@ class SchedulingService:
             )
         )
         rows = (await self._session.execute(stmt)).all()
+        name_map = await mentor_display_name_map(
+            self._session,
+            [conn.mentor_user_id for conn, _ in rows],
+        )
         # Default cost: gamification BOOK_MENTOR_SESSION.base_credit_value; PEER tier is fallback only.
         default_credit = await self._default_booking_credits()
         out: list[dict] = []
@@ -131,7 +135,7 @@ class SchedulingService:
                 {
                     "connection_id": conn_token,
                     "mentor_id": str(conn.mentor_user_id),
-                    "mentor_name": partner_display_name_from_mentor_profile(mp, user_id=conn.mentor_user_id),
+                    "mentor_name": name_map.get(conn.mentor_user_id, ""),
                     "expertise": list(mp.expertise or []),
                     "total_hours": 0,
                     "tier": tier_txt,

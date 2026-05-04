@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import MenteeProfile, MentorProfile
 from app.schemas.search import SearchResult, SearchRole
-from app.utils.profile_display_name import search_name_fields_from_mentee, search_name_fields_from_mentor
+from app.utils.profile_display_name import mentee_display_name_map, mentor_display_name_map
 
 
 class SearchService:
@@ -65,13 +65,16 @@ class SearchService:
             stmt = stmt.where(or_(expertise_match, bio_match, uid_match))
 
         results = (await self._session.execute(stmt)).scalars().all()
+        nm = await mentor_display_name_map(self._session, [m.user_id for m in results])
         return [
             SearchResult(
                 user_id=m.user_id,
                 role=SearchRole.mentor,
                 expertise=list(m.expertise or []),
                 tier="PEER",
-                **search_name_fields_from_mentor(m),
+                first_name=None,
+                last_name=None,
+                full_name=nm.get(m.user_id),
             )
             for m in results
         ]
@@ -98,13 +101,16 @@ class SearchService:
             stmt = stmt.where(or_(goals_match, edu_match, uid_match))
 
         results = (await self._session.execute(stmt)).scalars().all()
+        nm = await mentee_display_name_map(self._session, [m.user_id for m in results])
         return [
             SearchResult(
                 user_id=m.user_id,
                 role=SearchRole.mentee,
                 expertise=list(m.learning_goals or []),
                 tier=None,
-                **search_name_fields_from_mentee(m),
+                first_name=None,
+                last_name=None,
+                full_name=nm.get(m.user_id),
             )
             for m in results
         ]

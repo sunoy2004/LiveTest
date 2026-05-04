@@ -109,6 +109,46 @@ def _mentee_display_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str
     return "COALESCE(" + ", ".join(parts) + ", '')"
 
 
+def _mentor_person_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str:
+    """Human-readable name only (sessions, SPA titles). No bio, expertise, or topics."""
+    a = alias
+    parts: list[str] = []
+    if "first_name" in mp_cols and "last_name" in mp_cols:
+        parts.append(
+            f"NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM({a}.first_name::text), ''), "
+            f"NULLIF(TRIM({a}.last_name::text), ''))), '')"
+        )
+    if "full_name" in mp_cols:
+        parts.append(f"NULLIF(TRIM({a}.full_name::text), '')")
+    for col in ("display_name", "headline", "public_name", "current_title"):
+        if col in mp_cols:
+            parts.append(f"NULLIF(TRIM(LEFT(COALESCE({a}.{col}::text, ''), 120)), '')")
+    if not parts:
+        return "''::text"
+    return "COALESCE(" + ", ".join(parts) + ", '')"
+
+
+def _mentee_person_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str:
+    """Human-readable mentee name only (session partner line). No learning_goals essay."""
+    a = alias
+    parts: list[str] = []
+    if "first_name" in mp_cols and "last_name" in mp_cols:
+        parts.append(
+            f"NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM({a}.first_name::text), ''), "
+            f"NULLIF(TRIM({a}.last_name::text), ''))), '')"
+        )
+    if "full_name" in mp_cols:
+        parts.append(f"NULLIF(TRIM({a}.full_name::text), '')")
+    for col in ("display_name", "preferred_name", "headline"):
+        if col in mp_cols:
+            parts.append(f"NULLIF(TRIM(LEFT(COALESCE({a}.{col}::text, ''), 120)), '')")
+    if "education_level" in mp_cols:
+        parts.append(f"NULLIF(TRIM(LEFT(COALESCE({a}.education_level::text, ''), 48)), '')")
+    if not parts:
+        return "''::text"
+    return "COALESCE(" + ", ".join(parts) + ", '')"
+
+
 def _mentor_tier_expr(mp_cols: frozenset[str]) -> str:
     if "tier_id" in mp_cols:
         return "COALESCE(mp.tier_id::text, 'PEER')"

@@ -15,6 +15,7 @@ from app.models import (
 )
 from app.utils.display_name import label_from_user_id
 from app.services.upcoming_sessions_merge import list_merged_upcoming_sessions
+from app.utils.profile_display_name import mentee_display_name_map, mentor_display_name_map
 
 
 def _goal_api_item(row: Goal) -> dict:
@@ -150,15 +151,25 @@ class DashboardService:
             .order_by(MentorshipSession.start_time.desc())
         )
         results = (await self._session.execute(stmt)).all()
+        mentor_ids = {s.mentor_user_id for s, _ in results if s.mentor_user_id}
+        mentee_ids = {s.mentee_user_id for s, _ in results if s.mentee_user_id}
+        mo_map = await mentor_display_name_map(self._session, mentor_ids)
+        me_map = await mentee_display_name_map(self._session, mentee_ids)
+
+        def _partner(sess: MentorshipSession) -> str:
+            if sess.mentee_user_id == user_id and sess.mentor_user_id:
+                return mo_map.get(sess.mentor_user_id) or label_from_user_id(sess.mentor_user_id)
+            if sess.mentee_user_id:
+                return me_map.get(sess.mentee_user_id) or label_from_user_id(sess.mentee_user_id)
+            return "Partner"
+
         return [
             {
                 "session_id": str(sess.id),
                 "start_time": sess.start_time,
                 "notes": hist.notes or "",
                 "rating": hist.rating,
-                "partner_name": label_from_user_id(sess.mentor_user_id)
-                if sess.mentee_user_id == user_id
-                else label_from_user_id(sess.mentee_user_id),
+                "partner_name": _partner(sess),
             }
             for sess, hist in results
         ]
@@ -185,14 +196,17 @@ class DashboardService:
             .limit(limit)
         )
         rows = (await self._session.execute(stmt)).scalars().all()
+        mo_map = await mentor_display_name_map(self._session, {r.mentor_user_id for r in rows if r.mentor_user_id})
+        me_map = await mentee_display_name_map(self._session, {r.mentee_user_id for r in rows if r.mentee_user_id})
         out: list[dict] = []
         for req in rows:
             is_mentee = req.mentee_user_id == user_id
-            partner_name = (
-                label_from_user_id(req.mentor_user_id)
-                if is_mentee
-                else label_from_user_id(req.mentee_user_id)
-            )
+            if is_mentee and req.mentor_user_id:
+                partner_name = mo_map.get(req.mentor_user_id) or label_from_user_id(req.mentor_user_id)
+            elif req.mentee_user_id:
+                partner_name = me_map.get(req.mentee_user_id) or label_from_user_id(req.mentee_user_id)
+            else:
+                partner_name = "Partner"
             st = req.requested_time
             ca = req.created_at
             out.append(

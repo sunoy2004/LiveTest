@@ -15,7 +15,7 @@ from app.models import (
 from app.services.book_mentor_session_credits import resolve_default_book_session_credits
 from app.services.gamification_transactions import fetch_wallet_balance_from_gamification
 from app.utils.connection_token import mentoring_connection_token
-from app.utils.display_name import label_from_user_id
+from app.utils.profile_display_name import display_name_from_mentor_profile
 
 
 class SchedulingService:
@@ -131,7 +131,7 @@ class SchedulingService:
                 {
                     "connection_id": conn_token,
                     "mentor_id": str(conn.mentor_user_id),
-                    "mentor_name": label_from_user_id(conn.mentor_user_id),
+                    "mentor_name": display_name_from_mentor_profile(mp, user_id=conn.mentor_user_id),
                     "expertise": list(mp.expertise or []),
                     "total_hours": 0,
                     "tier": tier_txt,

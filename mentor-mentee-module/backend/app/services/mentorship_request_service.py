@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.publisher import publish_event
 from app.utils.display_name import label_from_user_id
+from app.utils.profile_display_name import mentee_display_name_map, mentor_display_name_map
 from app.models import (
     MenteeProfile,
     MentorProfile,
@@ -99,6 +100,9 @@ class MentorshipRequestService:
             MentorshipRequest.status == MentorshipRequestStatus.PENDING,
         )
         results = (await self._session.execute(stmt)).scalars().all()
+        me_map = await mentee_display_name_map(
+            self._session, {r.sender_user_id for r in results},
+        )
         out = []
         for req in results:
             intro = getattr(req, "intro_message", None) or ""
@@ -106,7 +110,8 @@ class MentorshipRequestService:
                 "sender_user_id": str(req.sender_user_id),
                 "receiver_user_id": str(req.receiver_user_id),
                 "status": req.status,
-                "mentee_name": label_from_user_id(req.sender_user_id),
+                "mentee_name": me_map.get(req.sender_user_id)
+                or label_from_user_id(req.sender_user_id),
                 "intro_message": intro,
             }
             out.append(d)
@@ -115,13 +120,17 @@ class MentorshipRequestService:
     async def get_outgoing_requests(self, mentee_user_id: uuid.UUID) -> list[dict]:
         stmt = select(MentorshipRequest).where(MentorshipRequest.sender_user_id == mentee_user_id)
         results = (await self._session.execute(stmt)).scalars().all()
+        mo_map = await mentor_display_name_map(
+            self._session, {r.receiver_user_id for r in results},
+        )
         out = []
         for req in results:
             d = {
                 "sender_user_id": str(req.sender_user_id),
                 "receiver_user_id": str(req.receiver_user_id),
                 "status": req.status,
-                "mentor_name": label_from_user_id(req.receiver_user_id),
+                "mentor_name": mo_map.get(req.receiver_user_id)
+                or label_from_user_id(req.receiver_user_id),
             }
             out.append(d)
         return out
@@ -141,6 +150,12 @@ class MentorshipRequestService:
             .limit(limit)
         )
         results = (await self._session.execute(stmt)).scalars().all()
+        me_map = await mentee_display_name_map(
+            self._session, {r.sender_user_id for r in results},
+        )
+        mo_map = await mentor_display_name_map(
+            self._session, {r.receiver_user_id for r in results},
+        )
         uid_str = str(user_id)
         out: list[dict] = []
         for req in results:
@@ -152,8 +167,10 @@ class MentorshipRequestService:
                     "status": req.status,
                     "intro_message": intro,
                     "created_at": req.created_at.isoformat() if req.created_at else None,
-                    "mentee_name": label_from_user_id(req.sender_user_id),
-                    "mentor_name": label_from_user_id(req.receiver_user_id),
+                    "mentee_name": me_map.get(req.sender_user_id)
+                    or label_from_user_id(req.sender_user_id),
+                    "mentor_name": mo_map.get(req.receiver_user_id)
+                    or label_from_user_id(req.receiver_user_id),
                     "you_are": "mentor"
                     if uid_str == str(req.receiver_user_id)
                     else "mentee",
@@ -178,14 +195,18 @@ class MentorshipRequestService:
             MentorshipConnection.status == "ACTIVE",
         )
         results = (await self._session.execute(stmt)).scalars().all()
+        mo_map = await mentor_display_name_map(self._session, {c.mentor_user_id for c in results})
+        me_map = await mentee_display_name_map(self._session, {c.mentee_user_id for c in results})
         out = []
         for conn in results:
             d = {
                 "mentor_user_id": str(conn.mentor_user_id),
                 "mentee_user_id": str(conn.mentee_user_id),
                 "status": conn.status,
-                "mentor_name": label_from_user_id(conn.mentor_user_id),
-                "mentee_name": label_from_user_id(conn.mentee_user_id),
+                "mentor_name": mo_map.get(conn.mentor_user_id)
+                or label_from_user_id(conn.mentor_user_id),
+                "mentee_name": me_map.get(conn.mentee_user_id)
+                or label_from_user_id(conn.mentee_user_id),
             }
             out.append(d)
         return out

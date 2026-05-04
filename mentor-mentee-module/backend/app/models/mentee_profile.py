@@ -24,7 +24,7 @@ class MenteeProfile(Base):
         index=True,
     )
     user_id = synonym("id")
-    # Names come from users.email; not stored on mentee_profiles per DB schema.
+    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     learning_goals: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=True)
     education_level: Mapped[str | None] = mapped_column(String(128), nullable=True)
     cached_credit_score: Mapped[int] = mapped_column(

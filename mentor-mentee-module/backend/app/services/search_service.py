@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import MenteeProfile, MentorProfile
 from app.schemas.search import SearchResult, SearchRole
-from app.utils.display_name import label_from_user_id
+from app.utils.profile_display_name import search_name_fields_from_mentee, search_name_fields_from_mentor
 
 
 class SearchService:
@@ -68,11 +68,10 @@ class SearchService:
         return [
             SearchResult(
                 user_id=m.user_id,
-                first_name=label_from_user_id(m.user_id),
-                last_name=None,
                 role=SearchRole.mentor,
                 expertise=list(m.expertise or []),
                 tier="PEER",
+                **search_name_fields_from_mentor(m),
             )
             for m in results
         ]
@@ -102,11 +101,10 @@ class SearchService:
         return [
             SearchResult(
                 user_id=m.user_id,
-                first_name=label_from_user_id(m.user_id),
-                last_name=None,
                 role=SearchRole.mentee,
                 expertise=list(m.learning_goals or []),
                 tier=None,
+                **search_name_fields_from_mentee(m),
             )
             for m in results
         ]

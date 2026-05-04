@@ -61,39 +61,62 @@ async def _columns(session: AsyncSession, table: str) -> frozenset[str]:
     return _col_cache[table]
 
 
-def _display_name(email: str | None, full_name: str | None) -> str:
-    fn = (full_name or "").strip()
-    if fn:
-        return fn
-    em = (email or "").strip()
-    if "@" in em:
-        local = em.split("@", 1)[0]
-        return local.replace(".", " ").replace("_", " ").strip().title()
-    return "User"
-
-
-def _mentor_display_name_expr(mp_cols: frozenset[str]) -> str:
-    """Person-name fields only; `bio` is a headline/summary and must not appear as Mentor name."""
-    has_fn = "full_name" in mp_cols
-    has_first = "first_name" in mp_cols
-    has_last = "last_name" in mp_cols
-    if has_first and has_last:
-        merged = (
-            "NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM(mp.first_name::text), ''), "
-            "NULLIF(TRIM(mp.last_name::text), ''))), '')"
+def _mentor_display_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str:
+    """Admin display: person-name columns, else short bio / expertise (not tier pricing)."""
+    a = alias
+    parts: list[str] = []
+    if "first_name" in mp_cols and "last_name" in mp_cols:
+        parts.append(
+            f"NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM({a}.first_name::text), ''), "
+            f"NULLIF(TRIM({a}.last_name::text), ''))), '')"
         )
-        if has_fn:
-            return f"COALESCE({merged}, NULLIF(TRIM(mp.full_name::text), ''), '')"
-        return f"COALESCE({merged}, '')"
-    if has_fn:
-        return "COALESCE(NULLIF(TRIM(mp.full_name::text), ''), '')"
-    return "''::text"
+    if "full_name" in mp_cols:
+        parts.append(f"NULLIF(TRIM({a}.full_name::text), '')")
+    if "bio" in mp_cols:
+        parts.append(f"NULLIF(TRIM(LEFT(COALESCE({a}.bio::text, ''), 100)), '')")
+    exp_col = "expertise" if "expertise" in mp_cols else ("expertise_areas" if "expertise_areas" in mp_cols else None)
+    if exp_col:
+        parts.append(
+            f"NULLIF(TRIM(LEFT(COALESCE(array_to_string({a}.{exp_col}, ', ')::text, ''), 80)), '')"
+        )
+    if not parts:
+        return "''::text"
+    return "COALESCE(" + ", ".join(parts) + ", '')"
+
+
+def _mentee_display_name_expr(mp_cols: frozenset[str], alias: str = "mp") -> str:
+    """Admin display: full_name / first+last, else learning goals or education_level."""
+    a = alias
+    parts: list[str] = []
+    if "first_name" in mp_cols and "last_name" in mp_cols:
+        parts.append(
+            f"NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM({a}.first_name::text), ''), "
+            f"NULLIF(TRIM({a}.last_name::text), ''))), '')"
+        )
+    if "full_name" in mp_cols:
+        parts.append(f"NULLIF(TRIM({a}.full_name::text), '')")
+    if "learning_goals" in mp_cols:
+        parts.append(
+            f"NULLIF(TRIM(LEFT(COALESCE(array_to_string({a}.learning_goals, ', ')::text, ''), 100)), '')"
+        )
+    if "education_level" in mp_cols:
+        parts.append(f"NULLIF(TRIM(COALESCE({a}.education_level::text, '')), '')")
+    if not parts:
+        return "''::text"
+    return "COALESCE(" + ", ".join(parts) + ", '')"
 
 
 def _mentor_tier_expr(mp_cols: frozenset[str]) -> str:
     if "tier_id" in mp_cols:
         return "COALESCE(mp.tier_id::text, 'PEER')"
     return "'PEER'::text"
+
+
+def _admin_row_name(uid: str, display_sql_value: str | None) -> str:
+    s = (display_sql_value or "").strip()
+    if s:
+        return s
+    return label_from_user_id_str(uid)
 
 
 async def list_admin_mentors(session: AsyncSession) -> list[dict[str, Any]]:
@@ -103,8 +126,8 @@ async def list_admin_mentors(session: AsyncSession) -> list[dict[str, Any]]:
     r = await session.execute(
         text(
             f"""
-            SELECT mp.user_id::text AS id, ''::text AS email,
-                   {name_sql} AS full_name,
+            SELECT mp.user_id::text AS id, mp.user_id::text AS email,
+                   {name_sql} AS display_name,
                    {tier_sql} AS tier
             FROM mentor_profiles mp
             ORDER BY mp.user_id ASC
@@ -114,23 +137,17 @@ async def list_admin_mentors(session: AsyncSession) -> list[dict[str, Any]]:
     rows = r.fetchall()
     out: list[dict[str, Any]] = []
     for row in rows:
-        uid, email, full_name, tier = row
+        uid, email, display_name, tier = row
         out.append(
             {
                 "id": uid,
-                "name": _display_name(email, full_name or None),
-                "email": email or "",
+                "name": _admin_row_name(uid, display_name),
+                "email": email or uid,
                 "tier": tier or "PEER",
                 "base_credit_override": None,
             }
         )
     return out
-
-
-def _mentee_display_name_expr(mp_cols: frozenset[str]) -> str:
-    if "full_name" in mp_cols:
-        return "COALESCE(NULLIF(TRIM(mp.full_name::text), ''), '')"
-    return "''::text"
 
 
 async def list_admin_mentees(session: AsyncSession) -> list[dict[str, Any]]:
@@ -139,8 +156,8 @@ async def list_admin_mentees(session: AsyncSession) -> list[dict[str, Any]]:
     r = await session.execute(
         text(
             f"""
-            SELECT mp.user_id::text AS id, ''::text AS email,
-                   {name_sql} AS full_name,
+            SELECT mp.user_id::text AS id, mp.user_id::text AS email,
+                   {name_sql} AS display_name,
                    'ACTIVE'::text AS status
             FROM mentee_profiles mp
             ORDER BY mp.user_id ASC
@@ -149,12 +166,12 @@ async def list_admin_mentees(session: AsyncSession) -> list[dict[str, Any]]:
     )
     out: list[dict[str, Any]] = []
     for row in r.fetchall():
-        uid, email, full_name, status = row
+        uid, email, display_name, status = row
         out.append(
             {
                 "id": uid,
-                "name": _display_name(email, full_name or None),
-                "email": email or "",
+                "name": _admin_row_name(uid, display_name),
+                "email": email or uid,
                 "status": status or "ACTIVE",
             }
         )
@@ -162,14 +179,22 @@ async def list_admin_mentees(session: AsyncSession) -> list[dict[str, Any]]:
 
 
 async def list_admin_connections(session: AsyncSession, limit: int = 500) -> list[dict[str, Any]]:
+    mpc = await _columns(session, "mentor_profiles")
+    mec = await _columns(session, "mentee_profiles")
+    mentor_nm = _mentor_display_name_expr(mpc, "mpm")
+    mentee_nm = _mentee_display_name_expr(mec, "mpe")
     r = await session.execute(
         text(
-            """
+            f"""
             SELECT mc.mentor_user_id::text, mc.mentee_user_id::text,
                    mc.mentor_user_id::text AS mentor_email,
                    mc.mentee_user_id::text AS mentee_email,
+                   {mentor_nm} AS mentor_display,
+                   {mentee_nm} AS mentee_display,
                    COALESCE(mc.status, 'UNKNOWN') AS status
             FROM mentorship_connections mc
+            LEFT JOIN mentor_profiles mpm ON mpm.user_id = mc.mentor_user_id
+            LEFT JOIN mentee_profiles mpe ON mpe.user_id = mc.mentee_user_id
             ORDER BY mc.mentor_user_id ASC, mc.mentee_user_id ASC
             LIMIT :lim
             """
@@ -178,7 +203,7 @@ async def list_admin_connections(session: AsyncSession, limit: int = 500) -> lis
     )
     out: list[dict[str, Any]] = []
     for row in r.fetchall():
-        mid, meid, memail, meemail, st = row
+        mid, meid, memail, meemail, mentor_display, mentee_display, st = row
         tok = mentoring_connection_token(uuid.UUID(mid), uuid.UUID(meid))
         out.append(
             {
@@ -189,6 +214,8 @@ async def list_admin_connections(session: AsyncSession, limit: int = 500) -> lis
                 "mentee_user_id": meid,
                 "mentor_email": memail or "",
                 "mentee_email": meemail or "",
+                "mentor_name": _admin_row_name(mid, mentor_display),
+                "mentee_name": _admin_row_name(meid, mentee_display),
                 "status": st or "",
             }
         )
@@ -216,6 +243,7 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
     sess_cols = await _columns(session, "sessions")
     mc_cols = await _columns(session, "mentorship_connections")
     mp_cols = await _columns(session, "mentor_profiles")
+    mpee_cols = await _columns(session, "mentee_profiles")
 
     conn_sel = (
         "COALESCE(s.connection_id::text, '')" if "connection_id" in sess_cols else "''::text"
@@ -233,17 +261,24 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
 
     tier_join = _sessions_tier_join(mp_cols)
     price_sql = _admin_session_price_sql(sess_cols)
+    mentor_nm = _mentor_display_name_expr(mp_cols, "mp")
+    mentee_nm = _mentee_display_name_expr(mpee_cols, "mpe")
 
     if "mentor_user_id" in sess_cols and "mentee_user_id" in sess_cols:
+        sess_join = (
+            "LEFT JOIN mentee_profiles mpe ON mpe.user_id = s.mentee_user_id\n            " + tier_join
+        )
         sql = f"""
             SELECT s.session_id::text,
                    {conn_sel} AS connection_id,
                    s.mentor_user_id::text AS mentor_email,
                    s.mentee_user_id::text AS mentee_email,
+                   {mentor_nm} AS mentor_display,
+                   {mentee_nm} AS mentee_display,
                    {start_sel} AS start_time, s.status,
                    {price_sql} AS price
             FROM sessions s
-            {tier_join}
+            {sess_join}
             ORDER BY {order_sql}
             LIMIT 500
             """
@@ -259,16 +294,22 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
             if "tier_id" in mp_cols
             else "LEFT JOIN mentor_tiers mt ON mt.tier_id = 'PEER'"
         )
+        join_mc = (
+            "INNER JOIN mentorship_connections mc ON mc.connection_id = s.connection_id\n            "
+            "LEFT JOIN mentee_profiles mpe ON mpe.user_id = mc.mentee_user_id\n            "
+            + tier_join_mc
+        )
         sql = f"""
             SELECT s.session_id::text,
                    COALESCE(s.connection_id::text, '') AS connection_id,
                    mc.mentor_user_id::text AS mentor_email,
                    mc.mentee_user_id::text AS mentee_email,
+                   {mentor_nm} AS mentor_display,
+                   {mentee_nm} AS mentee_display,
                    {start_sel} AS start_time, s.status,
                    {price_sql} AS price
             FROM sessions s
-            INNER JOIN mentorship_connections mc ON mc.connection_id = s.connection_id
-            {tier_join_mc}
+            {join_mc}
             ORDER BY {order_sql}
             LIMIT 500
             """
@@ -278,13 +319,13 @@ async def list_admin_sessions(session: AsyncSession) -> list[dict[str, Any]]:
     r = await session.execute(text(sql))
     out: list[dict[str, Any]] = []
     for row in r.fetchall():
-        sid, conn_id, memail, meemail, start, st, price = row
+        sid, conn_id, memail, meemail, mentor_display, mentee_display, start, st, price = row
         out.append(
             {
                 "session_id": sid,
                 "connection_id": conn_id or "",
-                "mentor_name": label_from_user_id_str(memail),
-                "mentee_name": label_from_user_id_str(meemail),
+                "mentor_name": _admin_row_name(memail, mentor_display),
+                "mentee_name": _admin_row_name(meemail, mentee_display),
                 "start_time": start.isoformat() if isinstance(start, datetime) else str(start or ""),
                 "status": (st or "").upper() or "UNKNOWN",
                 "price": int(price or 0),

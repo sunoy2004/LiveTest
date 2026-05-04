@@ -14,6 +14,7 @@ class SearchResult(BaseModel):
     user_id: uuid.UUID
     first_name: str | None = None
     last_name: str | None = None
+    full_name: str | None = None
     role: SearchRole
     expertise: list[str] = Field(default_factory=list)
     tier: str | None = None

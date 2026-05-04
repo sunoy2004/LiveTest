@@ -21,6 +21,7 @@ from app.services.gamification_transactions import (
 from app.services.upcoming_sessions_merge import list_merged_upcoming_sessions
 from app.utils.connection_token import mentoring_connection_token
 from app.utils.display_name import label_from_user_id
+from app.utils.profile_display_name import mentee_display_name_map
 
 
 class SessionService:
@@ -56,12 +57,17 @@ class SessionService:
             .order_by(SessionBookingRequest.requested_time.asc())
         )
         rows = (await self._session.execute(stmt)).scalars().all()
+        mentee_ids = {r.mentee_user_id for r in rows if r.mentee_user_id}
+        mentee_names = await mentee_display_name_map(self._session, mentee_ids)
         tier_def = await self._session.get(MentorTier, "PEER")
         tier_fallback = int(tier_def.session_credit_cost) if tier_def else 0
         default_booking_credits = await resolve_default_book_session_credits(tier_fallback)
         out: list[dict] = []
         for req in rows:
-            mentee_name = label_from_user_id(req.mentee_user_id) if req.mentee_user_id else "Mentee"
+            if req.mentee_user_id:
+                mentee_name = mentee_names.get(req.mentee_user_id) or label_from_user_id(req.mentee_user_id)
+            else:
+                mentee_name = "Mentee"
             conn_id = mentoring_connection_token(req.mentor_user_id, req.mentee_user_id)
             slot_row = await self._session.scalar(
                 select(TimeSlot).where(

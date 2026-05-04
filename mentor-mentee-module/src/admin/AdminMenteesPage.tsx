@@ -50,7 +50,7 @@ export default function AdminMenteesPage() {
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input
           type="search"
-          placeholder="Search by name, email, or status…"
+          placeholder="Search by name, user ID, or status…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="bg-background pl-9"
@@ -63,7 +63,7 @@ export default function AdminMenteesPage() {
           <TableHeader>
             <TableRow className="border-border hover:bg-muted/40">
               <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
+              <TableHead>User ID</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>

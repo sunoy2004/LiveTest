@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import MenteeProfile, MentorProfile
 from app.schemas.profile import MenteeProfileCreate, MentorProfileCreate
 from app.services.gamification_transactions import fetch_wallet_balance_from_gamification
-from app.utils.display_name import label_from_user_id
+from app.utils.profile_display_name import display_name_from_mentor_profile
 
 
 class ProfileService:
@@ -99,7 +99,7 @@ class ProfileService:
         uid = str(mp.user_id)
         return {
             "email": "",
-            "display_name": label_from_user_id(mentor_user_id),
+            "display_name": display_name_from_mentor_profile(mp, user_id=mentor_user_id),
             "mentor_profile": {
                 "id": uid,
                 "user_id": uid,

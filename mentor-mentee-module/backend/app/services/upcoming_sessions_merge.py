@@ -13,6 +13,7 @@ from app.models import SessionBookingRequest
 from app.services.book_mentor_session_credits import resolve_default_book_session_credits
 from app.models import MentorTier
 from app.utils.display_name import label_from_user_id
+from app.utils.profile_display_name import mentee_display_name_map, mentor_display_name_map
 
 
 def _dt_key(dt: datetime | None) -> float:
@@ -77,13 +78,36 @@ async def list_merged_upcoming_sessions(
     rows_s = (await session.execute(stmt_sched)).scalars().all()
     rows_p = (await session.execute(stmt_pending)).scalars().all()
 
+    mentor_ids: set[uuid.UUID] = set()
+    mentee_ids: set[uuid.UUID] = set()
+    for s in rows_s:
+        if s.mentee_user_id == user_id and s.mentor_user_id:
+            mentor_ids.add(s.mentor_user_id)
+        elif s.mentor_user_id == user_id and s.mentee_user_id:
+            mentee_ids.add(s.mentee_user_id)
+    for req in rows_p:
+        if req.mentee_user_id == user_id and req.mentor_user_id:
+            mentor_ids.add(req.mentor_user_id)
+        elif req.mentor_user_id == user_id and req.mentee_user_id:
+            mentee_ids.add(req.mentee_user_id)
+
+    mentor_labels = await mentor_display_name_map(session, mentor_ids)
+    mentee_labels = await mentee_display_name_map(session, mentee_ids)
+
+    def _partner_name(is_viewer_mentee: bool, mentor_uid: uuid.UUID | None, mentee_uid: uuid.UUID | None) -> str:
+        if is_viewer_mentee:
+            if mentor_uid:
+                return mentor_labels.get(mentor_uid) or label_from_user_id(mentor_uid)
+            return "Mentor"
+        if mentee_uid:
+            return mentee_labels.get(mentee_uid) or label_from_user_id(mentee_uid)
+        return "Mentee"
+
     merged: list[tuple[float, dict]] = []
 
     for s in rows_s:
-        if s.mentee_user_id == user_id:
-            partner_name = label_from_user_id(s.mentor_user_id)
-        else:
-            partner_name = label_from_user_id(s.mentee_user_id)
+        is_me_mentee = s.mentee_user_id == user_id
+        partner_name = _partner_name(is_me_mentee, s.mentor_user_id, s.mentee_user_id)
 
         display_start = s.start_time or s.created_at
         st_iso = display_start.isoformat() if display_start else ""
@@ -108,10 +132,8 @@ async def list_merged_upcoming_sessions(
         )
 
     for req in rows_p:
-        if req.mentee_user_id == user_id:
-            partner_name = label_from_user_id(req.mentor_user_id)
-        else:
-            partner_name = label_from_user_id(req.mentee_user_id)
+        is_me_mentee = req.mentee_user_id == user_id
+        partner_name = _partner_name(is_me_mentee, req.mentor_user_id, req.mentee_user_id)
 
         display_start = req.requested_time or req.created_at
         st_iso = display_start.isoformat() if display_start else ""

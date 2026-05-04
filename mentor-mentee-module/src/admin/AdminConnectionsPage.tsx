@@ -14,12 +14,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useMentorShellAuth } from "@/context/MentorShellAuthContext";
 
-function displayNameFromEmail(email: string | undefined): string {
-  if (!email) return "User";
-  const local = email.split("@")[0] ?? "";
-  return local.replace(/\./g, " ").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 type MentorGroup = {
   mentorUserId: string;
   mentorEmail: string;
@@ -42,7 +36,7 @@ function groupConnections(rows: AdminConnectionRow[]): MentorGroup[] {
       g = {
         mentorUserId: r.mentor_user_id,
         mentorEmail: r.mentor_email,
-        mentorName: displayNameFromEmail(r.mentor_email),
+        mentorName: r.mentor_name?.trim() || r.mentor_email || "User",
         mentees: [],
       };
       map.set(r.mentor_user_id, g);
@@ -54,7 +48,7 @@ function groupConnections(rows: AdminConnectionRow[]): MentorGroup[] {
       connectionId: r.connection_id,
       menteeUserId: r.mentee_user_id,
       menteeEmail: r.mentee_email,
-      menteeName: displayNameFromEmail(r.mentee_email),
+      menteeName: r.mentee_name?.trim() || r.mentee_email || "User",
       status: r.status,
     });
   }
@@ -128,7 +122,7 @@ export default function AdminConnectionsPage() {
       <div className="flex gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
         <p>
-          Search matches mentor or mentee name or email. Mentors with no matching mentees are hidden when the query only
+          Search matches mentor or mentee name, user ID, or status. Mentors with no matching mentees are hidden when the query only
           matches a mentee elsewhere.
         </p>
       </div>
@@ -203,7 +197,7 @@ export default function AdminConnectionsPage() {
                 <TableHeader>
                   <TableRow className="border-border hover:bg-muted/40">
                     <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
+                    <TableHead>User ID</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>

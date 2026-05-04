@@ -28,8 +28,12 @@ export type AdminConnectionRow = {
   mentee_profile_id: string;
   mentor_user_id: string;
   mentee_user_id: string;
+  /** Legacy field: holds mentor `user_id` (no mailbox on mentoring replica). */
   mentor_email: string;
+  /** Legacy field: holds mentee `user_id`. */
   mentee_email: string;
+  mentor_name: string;
+  mentee_name: string;
   status: string;
 };
 

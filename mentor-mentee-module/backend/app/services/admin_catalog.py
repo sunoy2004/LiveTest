@@ -2,6 +2,7 @@
 
 Queries adapt to schema drift: some DBs were created from Alembic 001 (e.g. reports `id`,
 `mentor_profiles.full_name`) and others from SQLAlchemy models (`report_id`, `bio`, no `tier_id`).
+Admin mentor roster names use person-name columns only; `bio` is never used as a display name.
 """
 
 from __future__ import annotations
@@ -71,16 +72,18 @@ def _display_name(email: str | None, full_name: str | None) -> str:
 
 
 def _mentor_display_name_expr(mp_cols: frozenset[str]) -> str:
-    """Only reference columns present on disk — ORM-shaped DBs use `bio`, not `full_name`."""
+    """Person-name fields only; `bio` is a headline/summary and must not appear as Mentor name."""
     has_fn = "full_name" in mp_cols
-    has_bio = "bio" in mp_cols
-    if has_bio and has_fn:
-        return (
-            "COALESCE(NULLIF(TRIM(mp.bio::text), ''), "
-            "NULLIF(TRIM(mp.full_name::text), ''), '')"
+    has_first = "first_name" in mp_cols
+    has_last = "last_name" in mp_cols
+    if has_first and has_last:
+        merged = (
+            "NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM(mp.first_name::text), ''), "
+            "NULLIF(TRIM(mp.last_name::text), ''))), '')"
         )
-    if has_bio:
-        return "COALESCE(NULLIF(TRIM(mp.bio::text), ''), '')"
+        if has_fn:
+            return f"COALESCE({merged}, NULLIF(TRIM(mp.full_name::text), ''), '')"
+        return f"COALESCE({merged}, '')"
     if has_fn:
         return "COALESCE(NULLIF(TRIM(mp.full_name::text), ''), '')"
     return "''::text"

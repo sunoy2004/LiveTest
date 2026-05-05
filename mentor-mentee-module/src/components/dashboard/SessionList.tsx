@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { Session } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { Video, Calendar, ArrowRight, Clock, Star, FileText, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { patchSessionMeetingFields } from "@/api/dashboardApi";
+import { toast } from "@/hooks/use-toast";
 
 interface SessionListProps {
   sessions: Session[];
@@ -23,6 +28,10 @@ interface SessionListProps {
   emptySubtitle?: string;
   /** When the list API failed (e.g. mentoring proxy missing); distinct from “no sessions”. */
   loadError?: string | null;
+  /** Saves PATCH /sessions/{id}/meeting-fields (mentor & mentee). */
+  token?: string | null;
+  /** Refresh dashboard queries after saving notes/outcome. */
+  onDashboardSessionFieldsSaved?: () => void;
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -63,9 +72,57 @@ const SessionList = ({
   emptyTitle,
   emptySubtitle,
   loadError,
+  token,
+  onDashboardSessionFieldsSaved,
 }: SessionListProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [upcomingDetail, setUpcomingDetail] = useState<Session | null>(null);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [outcomeDraft, setOutcomeDraft] = useState("");
+
+  useEffect(() => {
+    if (!upcomingDetail) {
+      setNotesDraft("");
+      setOutcomeDraft("");
+      return;
+    }
+    setNotesDraft(upcomingDetail.meetingNotes ?? "");
+    setOutcomeDraft(upcomingDetail.meetingOutcome ?? "");
+  }, [
+    upcomingDetail?.id,
+    upcomingDetail?.meetingNotes,
+    upcomingDetail?.meetingOutcome,
+  ]);
+
+  const saveMeetingFieldsMutation = useMutation({
+    mutationFn: async (args: { sessionId: string; notes: string; outcome: string }) => {
+      if (!token) throw new Error("Not signed in");
+      return patchSessionMeetingFields(token, args.sessionId, {
+        meeting_notes: args.notes,
+        meeting_outcome: args.outcome,
+      });
+    },
+    onSuccess: (data, vars) => {
+      setUpcomingDetail((prev) =>
+        prev && prev.id === vars.sessionId
+          ? {
+              ...prev,
+              meetingNotes: data.meeting_notes,
+              meetingOutcome: data.meeting_outcome,
+            }
+          : prev,
+      );
+      onDashboardSessionFieldsSaved?.();
+      toast({ title: "Saved", description: "Meeting notes and outcome are synced for both sides." });
+    },
+    onError: (err) => {
+      toast({
+        title: "Save failed",
+        description: err instanceof Error ? err.message.slice(0, 240) : "Unknown error",
+        variant: "destructive",
+      });
+    },
+  });
 
   if (sessions.length === 0) {
     if (loadError?.trim()) {
@@ -245,6 +302,18 @@ const SessionList = ({
                       <span className="text-muted-foreground ml-1">{session.notes}</span>
                     </div>
                   )}
+                  {session.meetingNotes?.trim() ? (
+                    <div>
+                      <span className="font-semibold text-foreground">Meeting notes:</span>
+                      <span className="text-muted-foreground ml-1 whitespace-pre-wrap">{session.meetingNotes}</span>
+                    </div>
+                  ) : null}
+                  {session.meetingOutcome?.trim() ? (
+                    <div>
+                      <span className="font-semibold text-foreground">Meeting outcome:</span>
+                      <span className="text-muted-foreground ml-1 whitespace-pre-wrap">{session.meetingOutcome}</span>
+                    </div>
+                  ) : null}
                   {(session.mentorRating != null || session.menteeRating != null) && (
                     <div className="space-y-1">
                       {session.mentorRating != null && (
@@ -390,6 +459,68 @@ const SessionList = ({
                         <span className="text-muted-foreground">Link not available yet</span>
                       )}
                     </dd>
+                  </div>
+                  <div className="space-y-3 border-t border-border/40 pt-3.5">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Shared with your partner
+                    </p>
+                    {upcomingDetail.id.startsWith("req:") ? (
+                      <p className="text-xs text-muted-foreground">
+                        Meeting notes and outcome are available after your mentor accepts and a session is created.
+                      </p>
+                    ) : null}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="session-meeting-notes" className="text-xs text-foreground">
+                        Meeting notes
+                      </Label>
+                      <Textarea
+                        id="session-meeting-notes"
+                        rows={4}
+                        className="min-h-[88px] resize-y text-sm"
+                        placeholder="Agenda, topics covered, links…"
+                        value={notesDraft}
+                        onChange={(e) => setNotesDraft(e.target.value)}
+                        disabled={!token || upcomingDetail.id.startsWith("req:")}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="session-meeting-outcome" className="text-xs text-foreground">
+                        Meeting outcome
+                      </Label>
+                      <Textarea
+                        id="session-meeting-outcome"
+                        rows={4}
+                        className="min-h-[88px] resize-y text-sm"
+                        placeholder="Decisions, next steps, outcomes…"
+                        value={outcomeDraft}
+                        onChange={(e) => setOutcomeDraft(e.target.value)}
+                        disabled={!token || upcomingDetail.id.startsWith("req:")}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="w-full sm:w-auto"
+                      disabled={
+                        !token ||
+                        upcomingDetail.id.startsWith("req:") ||
+                        saveMeetingFieldsMutation.isPending
+                      }
+                      onClick={() => {
+                        const sid = upcomingDetail.id.startsWith("req:")
+                          ? null
+                          : upcomingDetail.id;
+                        if (!sid) return;
+                        saveMeetingFieldsMutation.mutate({
+                          sessionId: sid,
+                          notes: notesDraft,
+                          outcome: outcomeDraft,
+                        });
+                      }}
+                    >
+                      {saveMeetingFieldsMutation.isPending ? "Saving…" : "Save notes & outcome"}
+                    </Button>
                   </div>
                 </dl>
               </div>

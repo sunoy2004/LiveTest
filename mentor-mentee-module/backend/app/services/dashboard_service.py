@@ -108,6 +108,8 @@ class DashboardService:
                     "status": row["status"],
                     "partner_name": row["partner_name"],
                     "session_credit_cost": row["session_credit_cost"],
+                    "meeting_notes": row.get("meeting_notes") or "",
+                    "meeting_outcome": row.get("meeting_outcome") or "",
                 }
             )
         return out
@@ -170,6 +172,8 @@ class DashboardService:
                 "notes": hist.notes or "",
                 "rating": hist.rating,
                 "partner_name": _partner(sess),
+                "meeting_notes": sess.meeting_notes or "",
+                "meeting_outcome": sess.meeting_outcome or "",
             }
             for sess, hist in results
         ]

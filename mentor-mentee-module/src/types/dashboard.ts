@@ -8,6 +8,9 @@ export type UpcomingSessionResponse = {
   partner_name: string | null;
   session_credit_cost?: number | null;
   price?: number | null;
+  /** Shared session row — mentor & mentee can edit via PATCH …/sessions/{id}/meeting-fields */
+  meeting_notes?: string | null;
+  meeting_outcome?: string | null;
 };
 
 export type UpcomingSessionItemResponse = {
@@ -21,6 +24,8 @@ export type UpcomingSessionItemResponse = {
   price?: number | null;
   mentor?: { id: string; name: string; tier: string } | null;
   mentee?: { id: string; name: string } | null;
+  meeting_notes?: string | null;
+  meeting_outcome?: string | null;
 };
 
 export type GoalItemResponse = {
@@ -36,6 +41,8 @@ export type VaultItemResponse = {
   mentor_rating: number | null;
   mentee_rating: number | null;
   partner_name: string | null;
+  meeting_notes?: string | null;
+  meeting_outcome?: string | null;
 };
 
 /** GET /dashboard/stats */

@@ -512,6 +512,15 @@ const Index = () => {
             emptyTitle="No upcoming sessions"
             emptySubtitle="Request or schedule a session to see it here"
             loadError={upcomingSessionsLoadError}
+            token={token}
+            onDashboardSessionFieldsSaved={() => {
+              void queryClient.invalidateQueries({
+                queryKey: ["user-service", "dashboard", "upcoming-sessions", token, role],
+              });
+              void queryClient.invalidateQueries({
+                queryKey: ["user-service", "dashboard", "vault", token, role],
+              });
+            }}
           />
         </SectionCard>
         <ScheduleSessionDialog

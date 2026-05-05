@@ -127,6 +127,8 @@ async def list_merged_upcoming_sessions(
                     "session_credit_cost": cost,
                     "mentor_user_id": str(s.mentor_user_id),
                     "mentee_user_id": str(s.mentee_user_id),
+                    "meeting_notes": s.meeting_notes or "",
+                    "meeting_outcome": s.meeting_outcome or "",
                 },
             )
         )
@@ -158,6 +160,8 @@ async def list_merged_upcoming_sessions(
                     "session_credit_cost": cost,
                     "mentor_user_id": str(req.mentor_user_id) if req.mentor_user_id else "",
                     "mentee_user_id": str(req.mentee_user_id) if req.mentee_user_id else "",
+                    "meeting_notes": "",
+                    "meeting_outcome": "",
                 },
             )
         )

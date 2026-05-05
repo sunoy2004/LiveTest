@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String, Text
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -45,6 +45,9 @@ class Session(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=True)
     #: Credits charged when the mentor accepted this booking (gamification rule + tier fallback).
     session_credit_cost: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Shared field — mentor and mentee can edit (see PATCH /sessions/{id}/meeting-fields).
+    meeting_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meeting_outcome: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

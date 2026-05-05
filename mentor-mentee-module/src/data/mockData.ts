@@ -33,6 +33,9 @@ export interface Session {
   meetingUrl?: string;
   /** ISO start time from API for detail overlay. */
   startTimeIso?: string;
+  /** Shared with partner — from `sessions.meeting_notes`. */
+  meetingNotes?: string;
+  meetingOutcome?: string;
 }
 
 export interface Goal {

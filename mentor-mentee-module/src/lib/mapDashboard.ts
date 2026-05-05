@@ -77,6 +77,8 @@ export function mapUpcomingSessions(res: UpcomingSessionResponse): Session[] {
       meetingUrl: s.meeting_url ?? undefined,
       costCredits: cost,
       startTimeIso: s.start_time,
+      meetingNotes: typeof s.meeting_notes === "string" ? s.meeting_notes : undefined,
+      meetingOutcome: typeof s.meeting_outcome === "string" ? s.meeting_outcome : undefined,
     },
   ];
 }
@@ -106,6 +108,8 @@ export function mapUpcomingSessionList(items: UpcomingSessionItemResponse[]): Se
         meetingUrl: s.meeting_url ?? undefined,
         costCredits: cost,
         startTimeIso: s.start_time,
+        meetingNotes: typeof s.meeting_notes === "string" ? s.meeting_notes : undefined,
+        meetingOutcome: typeof s.meeting_outcome === "string" ? s.meeting_outcome : undefined,
       };
     });
 }
@@ -139,6 +143,8 @@ export function mapVaultSessions(items: VaultItemResponse[]): Session[] {
       rating: averageRating(v.mentor_rating, v.mentee_rating),
       mentorRating: v.mentor_rating ?? undefined,
       menteeRating: v.mentee_rating ?? undefined,
+      meetingNotes: typeof v.meeting_notes === "string" ? v.meeting_notes : undefined,
+      meetingOutcome: typeof v.meeting_outcome === "string" ? v.meeting_outcome : undefined,
     };
   });
 }

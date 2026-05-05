@@ -7,6 +7,8 @@ import type {
   VaultItemResponse,
 } from "@/types/dashboard";
 import { getMentoringApiBaseUrl, MENTORING_API_PREFIX } from "@/config/mentoring";
+
+const SESSIONS_BASE = `${getMentoringApiBaseUrl()}${MENTORING_API_PREFIX}/sessions`;
 import { parseJsonListResponse } from "@/lib/api/jsonListResponse";
 
 function dashboardHeaders(token: string): HeadersInit {
@@ -94,6 +96,33 @@ export async function fetchDashboardStats(
     throw new Error(err || `Dashboard stats failed (${res.status})`);
   }
   return res.json() as Promise<DashboardStatsResponse>;
+}
+
+export async function patchSessionMeetingFields(
+  token: string,
+  sessionId: string,
+  body: { meeting_notes: string; meeting_outcome: string },
+): Promise<{ session_id: string; meeting_notes: string; meeting_outcome: string }> {
+  const res = await fetch(
+    `${SESSIONS_BASE}/${encodeURIComponent(sessionId)}/meeting-fields`,
+    {
+      method: "PATCH",
+      headers: {
+        ...dashboardHeaders(token),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `Could not save session notes (${res.status})`);
+  }
+  return res.json() as Promise<{
+    session_id: string;
+    meeting_notes: string;
+    meeting_outcome: string;
+  }>;
 }
 
 export async function fetchSessionBookingLedger(

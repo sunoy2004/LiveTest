@@ -2,6 +2,7 @@ import uuid
 from datetime import timedelta
 
 from fastapi import HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,11 @@ from app.services.upcoming_sessions_merge import list_merged_upcoming_sessions
 from app.utils.connection_token import mentoring_connection_token
 from app.utils.display_name import label_from_user_id
 from app.utils.profile_display_name import mentee_display_name_map
+
+
+class SessionMeetingFieldsBody(BaseModel):
+    meeting_notes: str | None = Field(None, max_length=32_000)
+    meeting_outcome: str | None = Field(None, max_length=32_000)
 
 
 class SessionService:
@@ -217,6 +223,42 @@ class SessionService:
             raise HTTPException(status.HTTP_409_CONFLICT, "Request already processed")
         req.status = "REJECTED"
         await self._session.commit()
+
+    async def update_session_meeting_fields(
+        self,
+        user_id: uuid.UUID,
+        session_id: uuid.UUID,
+        body: SessionMeetingFieldsBody,
+    ) -> dict:
+        """Persist shared meeting notes/outcome; participant check (mentor or mentee only)."""
+        data = body.model_dump(exclude_unset=True)
+        if not data:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Provide meeting_notes and/or meeting_outcome",
+            )
+
+        sess = await self._session.get(MentorshipSession, session_id)
+        if not sess:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Session not found")
+        if user_id not in {sess.mentor_user_id, sess.mentee_user_id}:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this session",
+            )
+
+        if "meeting_notes" in data:
+            sess.meeting_notes = data["meeting_notes"]
+        if "meeting_outcome" in data:
+            sess.meeting_outcome = data["meeting_outcome"]
+
+        await self._session.commit()
+        await self._session.refresh(sess)
+        return {
+            "session_id": str(sess.id),
+            "meeting_notes": sess.meeting_notes or "",
+            "meeting_outcome": sess.meeting_outcome or "",
+        }
 
     async def create_session_history(self, user_id: uuid.UUID, session_id: uuid.UUID, notes: dict) -> dict:
         sess = await self._session.get(MentorshipSession, session_id)
